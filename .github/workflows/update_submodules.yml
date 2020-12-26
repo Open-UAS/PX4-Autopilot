@@ -1,0 +1,39 @@
+# This workflow updates some or all submodules to their latest remote commit on the target branch of this repo
+
+name: Update submodules to latest
+on:
+ schedule:
+    - cron: '*/30 * * * *' # every 30 minutes
+ workflow_dispatch: # on button click
+
+jobs:
+ Update_submodules:
+    runs-on: ubuntu-latest
+    name: Update submodules to latest
+    steps:
+     - uses: actions/checkout@v2
+       with:
+        ref: master                     #target branch
+        #submodules: 'recursive'     # possibly needed in your situation  
+     - name: Update
+       run: |
+         
+         git config --global user.name 'Actions Bot'
+         git config --global user.email '<>'
+         
+         #update all submodules
+         #git submodule update --recursive --remote --init
+         
+         #update only individual submodules
+         git submodule update --remote --init Tools/sitl_gazebo
+         git add Tools/sitl_gazebo
+                  
+         
+         if [[ `git status --porcelain --untracked-files=no` ]]; then
+           # Changes to commit
+           git commit -m "Update submodules to latest"
+           #push changes
+           git push
+         else
+           echo "no changes to commit"
+         fi
