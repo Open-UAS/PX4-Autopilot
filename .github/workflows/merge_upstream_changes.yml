@@ -19,7 +19,7 @@ jobs:
      - uses: actions/checkout@v2
        with:
         ref: master                          #target branch
-        token: ${{ secrets.GITHUB_TOKEN }}  #using personal auth token to allow modification of workflows
+        token: ${{ secrets.ACTIONS_TOKEN }}  #using personal auth token to allow modification of workflows
         fetch-depth: ''                      #fetch all history  
         #submodules: 'recursive'     # possibly needed in your situation  
      - name: Merge Upstream
