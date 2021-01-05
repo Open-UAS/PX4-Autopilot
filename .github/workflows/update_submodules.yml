@@ -17,6 +17,7 @@ jobs:
         #submodules: 'recursive'     # possibly needed in your situation  
      - name: Update
        run: |
+         set -x
          
          git config --global user.name 'Actions Bot'
          git config --global user.email '<>'
