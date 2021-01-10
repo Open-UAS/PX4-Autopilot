@@ -13,7 +13,7 @@ jobs:
     steps:
      - uses: actions/checkout@v2
        with:
-        ref: master                     #target branch
+        ref: stable                     #target branch
         #submodules: 'recursive'     # possibly needed in your situation  
      - name: Update
        run: |
