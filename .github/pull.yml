@@ -1,0 +1,7 @@
+version: "1"
+rules:
+  - base: stable            #target branch
+    upstream: PX4:stable    #source user and branch (this repo must be a fork of the source)
+    mergeMethod: none       #automerge PR?
+    reviewers:              #assign these people to review PR
+      - C-Glick
