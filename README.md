@@ -1,8 +1,8 @@
-# PX4 Drone Autopilot, Open UAS Fork
+# PX4 Drone Autopilot, OpenUAS Fork
 
 ## ***Switch to the [stable branch](https://github.com/LTL-AERO/PX4-Autopilot/tree/stable)***
 
-**The default branch (master) is only used for repository management and does not contain any firmware content**
+**The default branch (master) is only used for repository management and documentation, it does not contain any source code**
 
 
 ## Steps to compile custom firmware for Gazebo simulation
