@@ -40,6 +40,21 @@
  - additional details on running gazebo simulations with the px4 [can be found here](https://dev.px4.io/master/en/simulation/gazebo.html#gazebo-simulation)
 
 
+## Airframe documentation
+
+This fork adds several airframes that are developed by the OpenUAS team, they are as follows,
+
+1) 2150_open_uas
+    - Simulation airframe
+    - Made for gazebo simulations
+    - Fixed wing, standard plane
+    - config file: /ROMFS/px4fmu_common/init.d-posix/2150_open_uas
+2) 2151_open_uas_apprentice
+    - Airframe for the Apprentice off the shelf plane
+    - contains custom defualt configurations specific to the Apprentice
+    - Fixed wing, standard plane
+    - config file: /ROMFS/px4fmu_common/init.d/airframes/2151_open_uas_apprentice
+
 ## Repo Structure
 
 The github repository is managed by the [wei/Pull app](https://github.com/wei/pull) ([config file](.github/pull.yml)) and a submodule [update script](.github/workflows/update_submodules.yml)
