@@ -45,6 +45,10 @@ then
 
 	param set RWTO_TKOFF 1
 
+	#distance sensor for altimeter
+	#Benewake TFmini RangeFinder, Telem 2 port
+	param set SENS_TFMINI_CFG 102
+
 fi
 
 set MAV_TYPE 1
