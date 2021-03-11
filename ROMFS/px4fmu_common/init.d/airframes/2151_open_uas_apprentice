@@ -16,11 +16,10 @@ then
 	param set EKF2_MAG_ACCLIM 0
 	param set EKF2_MAG_YAWLIM 0
 
+	#autonomous landing parameters
 	param set FW_LND_AIRSPD_SC 1
-	param set FW_LND_ANG 8
-	param set FW_THR_LND_MAX 0
-
-	param set FW_L1_PERIOD 15
+	param set FW_LND_ANG 3
+	param set FW_THR_LND_MAX 0.2
 
 	param set FW_P_TC 0.5
 	param set FW_PR_FF 0.40
@@ -34,15 +33,21 @@ then
 
 	param set FW_L1_PERIOD 12
 
+	#wheel steering
 	param set FW_W_EN 1
 
+	#minimum loiter and takeoff alt.
 	param set MIS_LTRMIN_ALT 30
 	param set MIS_TAKEOFF_ALT 30
-
-	param set NAV_ACC_RAD 15
-	param set NAV_DLL_ACT 2
+	#default loiter radius
 	param set NAV_LOITER_RAD 50
 
+	#waypoint acceptance radius
+	param set NAV_ACC_RAD 15
+	#datalink loss failsafe mode
+	param set NAV_DLL_ACT 2
+
+	#takeoff from runway
 	param set RWTO_TKOFF 1
 
 	#distance sensor for altimeter
