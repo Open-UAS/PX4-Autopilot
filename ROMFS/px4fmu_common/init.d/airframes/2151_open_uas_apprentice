@@ -43,7 +43,14 @@ then
 
 	#distance sensor for altimeter
 	#Benewake TFmini RangeFinder, Telem 2 port
-	param set SENS_TFMINI_CFG 102
+	#param set SENS_TFMINI_CFG 102
+
+	#Lightware SF11/c rangefinder, Telem 2 port
+	param set SENS_EN_SF0X 5
+	param set SENS_SF0X_CFG 102
+
+	#use range finder for altitude estimate
+	param set EKF2_TERR_MASK 3
 	param set EKF2_RNG_AID 1
 	param set EKF2_RNG_A_VMAX 2
 	param set EKF2_RNG_A_HMAX 10
