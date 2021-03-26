@@ -18,17 +18,6 @@ then
 	param set FW_LND_ANG 3
 	#param set FW_THR_LND_MAX 0.2
 
-	param set FW_P_TC 0.5
-	param set FW_PR_FF 0.40
-	param set FW_PR_I 0.05
-	param set FW_PR_P 0.05
-
-	param set FW_R_TC 0.7
-	param set FW_RR_FF 0.20
-	param set FW_RR_I 0.02
-	param set FW_RR_P 0.22
-	param set FW_L1_PERIOD 12
-
 	#wheel steering
 	param set FW_W_EN 1
 
@@ -63,6 +52,21 @@ then
 
 	#enable "Full rate estimator (EKF2) replay topics" for logging
 	param set SDLOG_PROFILE 3
+
+	#if PX4_SIM_MODEL is not empty, load simulation parameters
+	if [ -n "$PX4_SIM_MODEL" ]
+	then
+		param set FW_P_TC 0.5
+		param set FW_PR_FF 0.40
+		param set FW_PR_I 0.05
+		param set FW_PR_P 0.05
+
+		param set FW_R_TC 0.7
+		param set FW_RR_FF 0.20
+		param set FW_RR_I 0.02
+		param set FW_RR_P 0.22
+		param set FW_L1_PERIOD 12
+	fi
 
 fi
 
