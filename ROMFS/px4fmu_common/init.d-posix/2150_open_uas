@@ -79,5 +79,4 @@ then
 
 fi
 
-set MIXER_FILE etc/mixers-sitl/plane_sitl.main.mix
-set MIXER custom
+set MIXER open_uas_apprentice
