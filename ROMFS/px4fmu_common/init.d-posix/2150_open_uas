@@ -1,6 +1,9 @@
 #!/bin/sh
 #
-# @name open_uas SITL
+# @name OpenUAS Veronica
+#
+# @type Standard Plane
+# @class Plane
 #
 
 sh /etc/init.d/rc.fw_defaults
@@ -16,7 +19,10 @@ then
 	param set FW_LND_USETER 1
 	param set FW_LND_AIRSPD_SC 1
 	param set FW_LND_ANG 3
-	#param set FW_THR_LND_MAX 0.2
+	param set FW_THR_LND_MAX 0
+	param set FW_LND_EARLYCFG 1
+
+	#param set FW_L1_PERIOD 12
 
 	#wheel steering
 	param set FW_W_EN 1
@@ -37,21 +43,24 @@ then
 
 	#distance sensor for altimeter
 	#Benewake TFmini RangeFinder, Telem 2 port
-	param set SENS_TFMINI_CFG 102
+	#param set SENS_TFMINI_CFG 102
 
 	#Lightware SF11/c rangefinder, Telem 2 port
-	#param set SENS_EN_SF0X 5
-	#param set SENS_SF0X_CFG 102
+	param set SENS_EN_SF0X 5
+	param set SENS_SF0X_CFG 102
 
 	#use range finder for altitude estimate
-	param set EKF2_TERR_MASK 3
-	param set EKF2_RNG_AID 1
-	param set EKF2_RNG_A_VMAX 2
-	param set EKF2_RNG_A_HMAX 10
+	param set EKF2_TERR_MASK 1
+	#param set EKF2_RNG_AID 1
+	#param set EKF2_RNG_A_VMAX 2
+	#param set EKF2_RNG_A_HMAX 10
 	param set EKF2_MIN_RNG 0.06
 
 	#enable "Full rate estimator (EKF2) replay topics" for logging
 	param set SDLOG_PROFILE 3
+
+	#number of battery cells
+	param set BAT1_N_CELLS 3
 
 	#if PX4_SIM_MODEL is not empty, load simulation parameters
 	if [ -n "$PX4_SIM_MODEL" ]
