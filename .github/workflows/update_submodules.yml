@@ -3,7 +3,7 @@
 name: Update submodules to latest
 on:
  schedule:
-    - cron: '*/30 * * * *' # every 30 minutes
+    - cron: '0 1 */1 * *' # every day at 01:00
  workflow_dispatch: # on button click
 
 jobs:
