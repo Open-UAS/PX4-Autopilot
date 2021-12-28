@@ -3,39 +3,38 @@ Aileron/rudder/elevator/throttle/ mixer for PX4FMU
 Single elevator output, flaps set to CG(0,4)
 
 
-Aileron mixer (roll + flaperon)
+Left Aileron mixer (roll + flaps)
 ---------------------------------
 
 M: 2
-
-S: 0 0  10000  10000      0 -10000  10000
 O:     -10000 -10000      0 -10000  10000
+S: 0 0  10000  10000      0 -10000  10000
 S: 0 4  10000  10000      0 -10000  10000
 
+
+Right Aileron mixer (roll + flaps)
+---------------------------------
+
 M: 2
+O:      10000  10000      0 -10000  10000
 S: 0 0  10000  10000      0 -10000  10000
-O:     -10000 -10000      0 -10000  10000
 S: 0 4 -10000 -10000      0 -10000  10000
 
 Elevator mixer
 ------------
-Two scalers total (output, roll).
 
 M: 1
-S: 0 1  -10000  -10000      0 -10000  10000
-
+O:      10000  10000      0 -10000  10000
+S: 0 1  10000  10000      0 -10000  10000
 
 Rudder mixer
 ------------
-Two scalers total (output, yaw).
 
 M: 1
 S: 0 2  10000  10000      0 -10000  10000
 
 Motor speed mixer
 -----------------
-Two scalers total (output, thrust).
-
 
 M: 1
 S: 0 3      0  20000 -10000 -10000  10000

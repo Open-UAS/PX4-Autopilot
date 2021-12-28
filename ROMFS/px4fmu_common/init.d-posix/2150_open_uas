@@ -75,8 +75,12 @@ then
 		param set FW_RR_I 0.02
 		param set FW_RR_P 0.22
 		param set FW_L1_PERIOD 12
+
+		#disable flaps because cannot control flaps with joystick
+		param set FW_FLAPS_SCL 0
 	fi
 
 fi
 
+set MIXER_FILE etc/mixers/open_uas_apprentice.main.mix
 set MIXER open_uas_apprentice
