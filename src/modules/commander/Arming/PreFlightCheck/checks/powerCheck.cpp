@@ -63,11 +63,16 @@ bool PreFlightCheck::powerCheck(orb_advert_t *mavlink_log_pub, const vehicle_sta
 		return true;
 	}
 
+	if (status.hil_state == vehicle_status_s::HIL_STATE_ON) {
+		// Ignore power check in HITL.
+		return true;
+	}
+
 	uORB::SubscriptionData<system_power_s> system_power_sub{ORB_ID(system_power)};
 	system_power_sub.update();
 	const system_power_s &system_power = system_power_sub.get();
 
-	if (hrt_elapsed_time(&system_power.timestamp) < 1_s) {
+	if (system_power.timestamp != 0) {
 		int32_t required_power_module_count = 0;
 		param_get(param_find("COM_POWER_COUNT"), &required_power_module_count);
 
@@ -101,7 +106,7 @@ bool PreFlightCheck::powerCheck(orb_advert_t *mavlink_log_pub, const vehicle_sta
 				success = false;
 
 				if (report_fail) {
-					mavlink_log_critical(mavlink_log_pub, "Power redundancy not met: %d instead of %d",
+					mavlink_log_critical(mavlink_log_pub, "Power redundancy not met: %d instead of %" PRId32,
 							     power_module_count, required_power_module_count);
 				}
 			}

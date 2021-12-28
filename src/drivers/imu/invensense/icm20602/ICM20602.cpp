@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,8 +45,8 @@ ICM20602::ICM20602(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Ro
 	SPI(DRV_IMU_DEVTYPE_ICM20602, MODULE_NAME, bus, device, spi_mode, bus_frequency),
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
 	_drdy_gpio(drdy_gpio),
-	_px4_accel(get_device_id(), ORB_PRIO_HIGH, rotation),
-	_px4_gyro(get_device_id(), ORB_PRIO_HIGH, rotation)
+	_px4_accel(get_device_id(), rotation),
+	_px4_gyro(get_device_id(), rotation)
 {
 	if (drdy_gpio != 0) {
 		_drdy_missed_perf = perf_alloc(PC_COUNT, MODULE_NAME": DRDY missed");
@@ -106,6 +106,30 @@ void ICM20602::print_status()
 	perf_print_counter(_drdy_missed_perf);
 }
 
+bool ICM20602::StoreCheckedRegisterValue(Register reg)
+{
+	// 3 retries
+	for (int i = 0; i < 3; i++) {
+		uint8_t read1 = RegisterRead(reg);
+		uint8_t read2 = RegisterRead(reg);
+
+		if (read1 == read2) {
+			for (auto &r : _register_cfg) {
+				if (r.reg == reg) {
+					r.set_bits = read1;
+					r.clear_bits = ~read1;
+					return true;
+				}
+			}
+
+		} else {
+			PX4_ERR("0x%02hhX read 1 != read 2 (0x%02hhX != 0x%02hhX)", static_cast<uint8_t>(reg), read1, read2);
+		}
+	}
+
+	return false;
+}
+
 int ICM20602::probe()
 {
 	const uint8_t whoami = RegisterRead(Register::WHO_AM_I);
@@ -139,6 +163,21 @@ void ICM20602::RunImpl()
 		if ((RegisterRead(Register::WHO_AM_I) == WHOAMI)
 		    && (RegisterRead(Register::PWR_MGMT_1) == 0x41)
 		    && (RegisterRead(Register::CONFIG) == 0x80)) {
+
+			// offset registers (factory calibration) should not change during normal operation
+			StoreCheckedRegisterValue(Register::XG_OFFS_TC_H);
+			StoreCheckedRegisterValue(Register::XG_OFFS_TC_L);
+			StoreCheckedRegisterValue(Register::YG_OFFS_TC_H);
+			StoreCheckedRegisterValue(Register::YG_OFFS_TC_L);
+			StoreCheckedRegisterValue(Register::ZG_OFFS_TC_H);
+			StoreCheckedRegisterValue(Register::ZG_OFFS_TC_L);
+
+			StoreCheckedRegisterValue(Register::XA_OFFSET_H);
+			StoreCheckedRegisterValue(Register::XA_OFFSET_L);
+			StoreCheckedRegisterValue(Register::YA_OFFSET_H);
+			StoreCheckedRegisterValue(Register::YA_OFFSET_L);
+			StoreCheckedRegisterValue(Register::ZA_OFFSET_H);
+			StoreCheckedRegisterValue(Register::ZA_OFFSET_L);
 
 			// Disable I2C, wakeup, and reset digital signal path
 			RegisterWrite(Register::I2C_IF, I2C_IF_BIT::I2C_IF_DIS); // set immediately to prevent switching into I2C mode
@@ -335,10 +374,6 @@ void ICM20602::ConfigureGyro()
 
 void ICM20602::ConfigureSampleRate(int sample_rate)
 {
-	if (sample_rate == 0) {
-		sample_rate = 800; // default to 800 Hz
-	}
-
 	// round down to nearest FIFO sample dt * SAMPLES_PER_TRANSFER
 	const float min_interval = FIFO_SAMPLE_DT * SAMPLES_PER_TRANSFER;
 	_fifo_empty_interval_us = math::max(roundf((1e6f / (float)sample_rate) / min_interval) * min_interval, min_interval);

@@ -107,7 +107,8 @@
 #define GPIO_HEATER_OUTPUT   /* PA8 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN8)
 
 /* PWM */
-#define DIRECT_PWM_OUTPUT_CHANNELS   8
+#define DIRECT_PWM_OUTPUT_CHANNELS   14
+#define BOARD_NUM_IO_TIMERS           4
 
 /* Power supply control and monitoring GPIOs */
 #define BOARD_NUMBER_BRICKS             2
@@ -129,7 +130,7 @@
 #define GPIO_nVDD_5V_PERIPH_OC          /* PJ4 */  (GPIO_INPUT|GPIO_FLOAT|GPIO_PORTJ|GPIO_PIN4)
 
 /* Power switch controls ******************************************************/
-#define VDD_5V_PERIPH_EN(on_true)          px4_arch_gpiowrite(GPIO_nVDD_5V_PERIPH_EN, !(on_true))
+#define VDD_5V_PERIPH_EN(on_true)          px4_arch_gpiowrite(GPIO_nVDD_5V_PERIPH_EN, (on_true))
 #define VDD_5V_HIPOWER_EN(on_true)         px4_arch_gpiowrite(GPIO_VDD_5V_HIPOWER_EN, (on_true))
 #define VDD_3V3_SD_CARD_EN(on_true)        px4_arch_gpiowrite(GPIO_VDD_3V3_SD_CARD_EN, (on_true))
 

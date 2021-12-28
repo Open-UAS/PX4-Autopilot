@@ -42,7 +42,7 @@ using math::radians;
 
 FixedwingAttitudeControl::FixedwingAttitudeControl(bool vtol) :
 	ModuleParams(nullptr),
-	WorkItem(MODULE_NAME, px4::wq_configurations::attitude_ctrl),
+	WorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers),
 	_actuators_0_pub(vtol ? ORB_ID(actuator_controls_virtual_fw) : ORB_ID(actuator_controls_0)),
 	_attitude_sp_pub(vtol ? ORB_ID(fw_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint)),
 	_loop_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle"))
@@ -143,23 +143,12 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 		// Always copy the new manual setpoint, even if it wasn't updated, to fill the _actuators with valid values
 		if (_manual_control_setpoint_sub.copy(&_manual_control_setpoint)) {
 
-			// Check if we are in rattitude mode and the pilot is above the threshold on pitch
-			if (_vcontrol_mode.flag_control_rattitude_enabled) {
-				if (fabsf(_manual_control_setpoint.y) > _param_fw_ratt_th.get()
-				    || fabsf(_manual_control_setpoint.x) > _param_fw_ratt_th.get()) {
-					_vcontrol_mode.flag_control_attitude_enabled = false;
-				}
-			}
-
-			if (!_vcontrol_mode.flag_control_climb_rate_enabled &&
-			    !_vcontrol_mode.flag_control_offboard_enabled) {
+			if (!_vcontrol_mode.flag_control_climb_rate_enabled) {
 
 				if (_vcontrol_mode.flag_control_attitude_enabled) {
 					// STABILIZED mode generate the attitude setpoint from manual user inputs
 
-					_att_sp.roll_body = _manual_control_setpoint.y * radians(_param_fw_man_r_max.get()) + radians(_param_fw_rsp_off.get());
-					_att_sp.roll_body = constrain(_att_sp.roll_body,
-								      -radians(_param_fw_man_r_max.get()), radians(_param_fw_man_r_max.get()));
+					_att_sp.roll_body = _manual_control_setpoint.y * radians(_param_fw_man_r_max.get());
 
 					_att_sp.pitch_body = -_manual_control_setpoint.x * radians(_param_fw_man_p_max.get())
 							     + radians(_param_fw_psp_off.get());
@@ -167,7 +156,7 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 								       -radians(_param_fw_man_p_max.get()), radians(_param_fw_man_p_max.get()));
 
 					_att_sp.yaw_body = 0.0f;
-					_att_sp.thrust_body[0] = _manual_control_setpoint.z;
+					_att_sp.thrust_body[0] = math::constrain(_manual_control_setpoint.z, 0.0f, 1.0f);
 
 					Quatf q(Eulerf(_att_sp.roll_body, _att_sp.pitch_body, _att_sp.yaw_body));
 					q.copyTo(_att_sp.q_d);
@@ -184,7 +173,7 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 					_rates_sp.roll = _manual_control_setpoint.y * radians(_param_fw_acro_x_max.get());
 					_rates_sp.pitch = -_manual_control_setpoint.x * radians(_param_fw_acro_y_max.get());
 					_rates_sp.yaw = _manual_control_setpoint.r * radians(_param_fw_acro_z_max.get());
-					_rates_sp.thrust_body[0] = _manual_control_setpoint.z;
+					_rates_sp.thrust_body[0] = math::constrain(_manual_control_setpoint.z, 0.0f, 1.0f);
 
 					_rate_sp_pub.publish(_rates_sp);
 
@@ -196,7 +185,7 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 						-_manual_control_setpoint.x * _param_fw_man_p_sc.get() + _param_trim_pitch.get();
 					_actuators.control[actuator_controls_s::INDEX_YAW] =
 						_manual_control_setpoint.r * _param_fw_man_y_sc.get() + _param_trim_yaw.get();
-					_actuators.control[actuator_controls_s::INDEX_THROTTLE] = _manual_control_setpoint.z;
+					_actuators.control[actuator_controls_s::INDEX_THROTTLE] = math::constrain(_manual_control_setpoint.z, 0.0f, 1.0f);
 				}
 			}
 		}
@@ -240,7 +229,7 @@ FixedwingAttitudeControl::vehicle_land_detected_poll()
 float FixedwingAttitudeControl::get_airspeed_and_update_scaling()
 {
 	_airspeed_validated_sub.update();
-	const bool airspeed_valid = PX4_ISFINITE(_airspeed_validated_sub.get().equivalent_airspeed_m_s)
+	const bool airspeed_valid = PX4_ISFINITE(_airspeed_validated_sub.get().calibrated_airspeed_m_s)
 				    && (hrt_elapsed_time(&_airspeed_validated_sub.get().timestamp) < 1_s);
 
 	// if no airspeed measurement is available out best guess is to use the trim airspeed
@@ -248,26 +237,27 @@ float FixedwingAttitudeControl::get_airspeed_and_update_scaling()
 
 	if ((_param_fw_arsp_mode.get() == 0) && airspeed_valid) {
 		/* prevent numerical drama by requiring 0.5 m/s minimal speed */
-		airspeed = math::max(0.5f, _airspeed_validated_sub.get().equivalent_airspeed_m_s);
+		airspeed = math::max(0.5f, _airspeed_validated_sub.get().calibrated_airspeed_m_s);
 
 	} else {
 		// VTOL: if we have no airspeed available and we are in hover mode then assume the lowest airspeed possible
 		// this assumption is good as long as the vehicle is not hovering in a headwind which is much larger
-		// than the minimum airspeed
+		// than the stall airspeed
 		if (_vehicle_status.is_vtol && _vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING
 		    && !_vehicle_status.in_transition_mode) {
-			airspeed = _param_fw_airspd_min.get();
+			airspeed = _param_fw_airspd_stall.get();
 		}
 	}
 
 	/*
-	 * For scaling our actuators using anything less than the min (close to stall)
+	 * For scaling our actuators using anything less than the stall
 	 * speed doesn't make any sense - its the strongest reasonable deflection we
 	 * want to do in flight and its the baseline a human pilot would choose.
 	 *
 	 * Forcing the scaling to this value allows reasonable handheld tests.
 	 */
-	const float airspeed_constrained = constrain(airspeed, _param_fw_airspd_min.get(), _param_fw_airspd_max.get());
+	const float airspeed_constrained = constrain(constrain(airspeed, _param_fw_airspd_stall.get(),
+					   _param_fw_airspd_max.get()), 0.1f, 1000.0f);
 
 	_airspeed_scaling = (_param_fw_arsp_scale_en.get()) ? (_param_fw_airspd_trim.get() / airspeed_constrained) : 1.0f;
 
@@ -380,9 +370,10 @@ void FixedwingAttitudeControl::Run()
 			wheel_control = true;
 		}
 
-		/* lock integrator until control is started or for long intervals (> 20 ms) */
+		// lock integrator if no rate control enabled, or in RW mode (but not transitioning VTOL or tailsitter), or for long intervals (> 20 ms)
 		bool lock_integrator = !_vcontrol_mode.flag_control_rates_enabled
-				       || (_vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING && ! _vehicle_status.in_transition_mode)
+				       || (_vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING &&
+					   !_vehicle_status.in_transition_mode && !_is_tailsitter)
 				       || (dt > 0.02f);
 
 		/* if we are in rotary wing mode, do nothing */
@@ -413,11 +404,11 @@ void FixedwingAttitudeControl::Run()
 			}
 
 			/* Reset integrators if the aircraft is on ground
-			 * or a multicopter (but not transitioning VTOL)
+			 * or a multicopter (but not transitioning VTOL or tailsitter)
 			 */
 			if (_landed
 			    || (_vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING
-				&& !_vehicle_status.in_transition_mode)) {
+				&& !_vehicle_status.in_transition_mode && !_is_tailsitter)) {
 
 				_roll_ctrl.reset_integrator();
 				_pitch_ctrl.reset_integrator();
@@ -436,7 +427,7 @@ void FixedwingAttitudeControl::Run()
 			control_input.roll_setpoint = _att_sp.roll_body;
 			control_input.pitch_setpoint = _att_sp.pitch_body;
 			control_input.yaw_setpoint = _att_sp.yaw_body;
-			control_input.airspeed_min = _param_fw_airspd_min.get();
+			control_input.airspeed_min = _param_fw_airspd_stall.get();
 			control_input.airspeed_max = _param_fw_airspd_max.get();
 			control_input.airspeed = airspeed;
 			control_input.scaler = _airspeed_scaling;
@@ -445,15 +436,20 @@ void FixedwingAttitudeControl::Run()
 			if (wheel_control) {
 				_local_pos_sub.update(&_local_pos);
 
-				/* Use min airspeed to calculate ground speed scaling region.
+				/* Use stall airspeed to calculate ground speed scaling region.
 				* Don't scale below gspd_scaling_trim
 				*/
 				float groundspeed = sqrtf(_local_pos.vx * _local_pos.vx + _local_pos.vy * _local_pos.vy);
-				float gspd_scaling_trim = (_param_fw_airspd_min.get() * 0.6f);
-				float groundspeed_scaler = gspd_scaling_trim / ((groundspeed < gspd_scaling_trim) ? gspd_scaling_trim : groundspeed);
+				float gspd_scaling_trim = (_param_fw_airspd_stall.get());
 
 				control_input.groundspeed = groundspeed;
-				control_input.groundspeed_scaler = groundspeed_scaler;
+
+				if (groundspeed > gspd_scaling_trim) {
+					control_input.groundspeed_scaler = gspd_scaling_trim / groundspeed;
+
+				} else {
+					control_input.groundspeed_scaler = 1.0f;
+				}
 			}
 
 			/* reset body angular rate limits on mode change */
@@ -481,11 +477,11 @@ void FixedwingAttitudeControl::Run()
 			float trim_yaw = _param_trim_yaw.get();
 
 			if (airspeed < _param_fw_airspd_trim.get()) {
-				trim_roll += gradual(airspeed, _param_fw_airspd_min.get(), _param_fw_airspd_trim.get(), _param_fw_dtrim_r_vmin.get(),
+				trim_roll += gradual(airspeed, _param_fw_airspd_stall.get(), _param_fw_airspd_trim.get(), _param_fw_dtrim_r_vmin.get(),
 						     0.0f);
-				trim_pitch += gradual(airspeed, _param_fw_airspd_min.get(), _param_fw_airspd_trim.get(), _param_fw_dtrim_p_vmin.get(),
+				trim_pitch += gradual(airspeed, _param_fw_airspd_stall.get(), _param_fw_airspd_trim.get(), _param_fw_dtrim_p_vmin.get(),
 						      0.0f);
-				trim_yaw += gradual(airspeed, _param_fw_airspd_min.get(), _param_fw_airspd_trim.get(), _param_fw_dtrim_y_vmin.get(),
+				trim_yaw += gradual(airspeed, _param_fw_airspd_stall.get(), _param_fw_airspd_trim.get(), _param_fw_dtrim_y_vmin.get(),
 						    0.0f);
 
 			} else {
@@ -569,10 +565,8 @@ void FixedwingAttitudeControl::Run()
 						if (_battery_status_sub.updated()) {
 							battery_status_s battery_status{};
 
-							if (_battery_status_sub.copy(&battery_status)) {
-								if (battery_status.scale > 0.0f) {
-									_battery_scale = battery_status.scale;
-								}
+							if (_battery_status_sub.copy(&battery_status) && battery_status.connected && battery_status.scale > 0.f) {
+								_battery_scale = battery_status.scale;
 							}
 						}
 

@@ -136,6 +136,13 @@ protected:
 	 */
 	virtual bool _get_ground_effect_state() { return false; }
 
+	virtual bool _get_in_descend() { return false; }
+	virtual bool _get_has_low_throttle() { return false; }
+	virtual bool _get_horizontal_movement() { return false; }
+	virtual bool _get_vertical_movement() { return false; }
+	virtual bool _get_close_to_ground_or_skipped_check() {  return false; }
+	virtual void _set_hysteresis_factor(const int factor) = 0;
+
 	systemlib::Hysteresis _freefall_hysteresis{false};
 	systemlib::Hysteresis _landed_hysteresis{true};
 	systemlib::Hysteresis _maybe_landed_hysteresis{true};
@@ -149,6 +156,7 @@ protected:
 
 	bool _armed{false};
 	bool _previous_armed_state{false};	///< stores the previous actuator_armed.armed state
+	bool _dist_bottom_is_observable{false};
 
 private:
 	void Run() override;
@@ -169,8 +177,9 @@ private:
 
 	uORB::Publication<vehicle_land_detected_s> _vehicle_land_detected_pub{ORB_ID(vehicle_land_detected)};
 
+	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
+
 	uORB::Subscription _actuator_armed_sub{ORB_ID(actuator_armed)};
-	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 

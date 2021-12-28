@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -119,6 +119,7 @@ int AnalogBattery::get_current_channel()
 	}
 }
 
+
 void
 AnalogBattery::updateParams()
 {
@@ -127,8 +128,8 @@ AnalogBattery::updateParams()
 				    &_analog_params.v_div, _first_parameter_update);
 		migrateParam<float>(_analog_param_handles.a_per_v_old, _analog_param_handles.a_per_v, &_analog_params.a_per_v_old,
 				    &_analog_params.a_per_v, _first_parameter_update);
-		migrateParam<int>(_analog_param_handles.adc_channel_old, _analog_param_handles.v_channel,
-				  &_analog_params.adc_channel_old, &_analog_params.v_channel, _first_parameter_update);
+		migrateParam<int32_t>(_analog_param_handles.adc_channel_old, _analog_param_handles.v_channel,
+				      &_analog_params.adc_channel_old, &_analog_params.v_channel, _first_parameter_update);
 
 	} else {
 		param_get(_analog_param_handles.v_div, &_analog_params.v_div);
@@ -139,7 +140,7 @@ AnalogBattery::updateParams()
 	param_get(_analog_param_handles.i_channel, &_analog_params.i_channel);
 	param_get(_analog_param_handles.v_offs_cur, &_analog_params.v_offs_cur);
 
-	if (_analog_params.v_div <= 0.0f) {
+	if (_analog_params.v_div < 0.0f) {
 		/* apply scaling according to defaults if set to default */
 		_analog_params.v_div = BOARD_BATTERY1_V_DIV;
 		param_set_no_notification(_analog_param_handles.v_div, &_analog_params.v_div);

@@ -33,7 +33,7 @@
 #pragma once
 
 
-#include <px4_platform/micro_hal.h>
+#include "../../../nxp_common/include/px4_arch/micro_hal.h"
 
 __BEGIN_DECLS
 
@@ -113,6 +113,7 @@ int kinetis_gpiosetevent(uint32_t pinset, bool risingedge, bool fallingedge, boo
 
 #define _PX4_MAKE_GPIO(pin_ftmx, io)    ((((uint32_t)(pin_ftmx)) & ~(_PIN_MODE_MASK | _PIN_OPTIONS_MASK)) |(io))
 #define PX4_MAKE_GPIO_INPUT(gpio) _PX4_MAKE_GPIO(gpio, GPIO_PULLUP)
-#define PX4_MAKE_GPIO_OUTPUT(gpio) _PX4_MAKE_GPIO(gpio, GPIO_HIGHDRIVE)
+#define PX4_MAKE_GPIO_OUTPUT_SET(gpio) _PX4_MAKE_GPIO(gpio, GPIO_HIGHDRIVE)
+#define PX4_MAKE_GPIO_OUTPUT_CLEAR(gpio) _PX4_MAKE_GPIO(gpio, GPIO_LOWDRIVE)
 
 __END_DECLS

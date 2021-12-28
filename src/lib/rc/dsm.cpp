@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -78,9 +78,10 @@ static dsm_buf_t &dsm_buf = rc_decode_buf.dsm.buf;	/**< DSM_BUFFER_SIZE DSM dsm 
 
 static uint16_t dsm_chan_buf[DSM_MAX_CHANNEL_COUNT];
 static unsigned dsm_partial_frame_count;	/**< Count of bytes received for current dsm frame */
-static unsigned dsm_channel_shift = 0;			/**< Channel resolution, 0=unknown, 1=10 bit, 2=11 bit */
+static unsigned dsm_channel_shift = 0;			/**< Channel resolution, 0=unknown, 10=10 bit (1024), 11=11 bit (2048) */
 static unsigned dsm_frame_drops = 0;			/**< Count of incomplete DSM frames */
 static uint16_t dsm_chan_count = 0;         /**< DSM channel count */
+static uint16_t dsm_chan_count_prev = 0;    /**< last valid DSM channel count */
 
 /**
  * Attempt to decode a single channel raw channel datum
@@ -135,7 +136,7 @@ static bool dsm_decode_channel(uint16_t raw, unsigned shift, uint8_t &channel, u
 
 		// Spektrum range is 903μs to 2097μs (Specification for Spektrum Remote Receiver Interfacing Rev G 9.1)
 		//  ±100% travel is 1102µs to 1898 µs
-		if (value < 990 || value > 2010) {
+		if (value < 903 || value > 2097) {
 			// if the value is unrealistic, fail the parsing entirely
 			PX4_DEBUG("channel %d invalid range %d", channel, value);
 			return false;
@@ -190,11 +191,13 @@ static bool dsm_decode_channel(uint16_t raw, unsigned shift, uint8_t &channel, u
 
 		// Spektrum range is 903μs to 2097μs (Specification for Spektrum Remote Receiver Interfacing Rev G 9.1)
 		//  ±100% travel is 1102µs to 1898 µs
-		if (value < 990 || value > 2010) {
+		if (value < 903 || value > 2097) {
 			// if the value is unrealistic, fail the parsing entirely
 			PX4_DEBUG("channel %d invalid range %d", channel, value);
 			return false;
 		}
+
+		PX4_DEBUG(stderr, "CH%d=%d(0x%02x), ", channel, value, raw);
 
 		return true;
 	}
@@ -207,8 +210,7 @@ static bool dsm_decode_channel(uint16_t raw, unsigned shift, uint8_t &channel, u
  *
  * @param[in] reset true=reset the 10/11 bit state to unknown
  */
-static bool
-dsm_guess_format(bool reset)
+static bool dsm_guess_format(bool reset)
 {
 	static uint32_t	cs10 = 0;
 	static uint32_t	cs11 = 0;
@@ -216,6 +218,7 @@ dsm_guess_format(bool reset)
 
 	/* reset the 10/11 bit sniffed channel masks */
 	if (reset) {
+		PX4_DEBUG("dsm_guess_format reset");
 		cs10 = 0;
 		cs11 = 0;
 		samples = 0;
@@ -281,12 +284,11 @@ dsm_guess_format(bool reset)
 	samples++;
 
 #ifdef DSM_DEBUG
-	printf("dsm guess format: samples: %d %s\n", samples,
-	       (reset) ? "RESET" : "");
+	printf("dsm guess format: samples: %d %s\n", samples, (reset) ? "RESET" : "");
 #endif
 
-	/* wait until we have seen plenty of frames - 5 should normally be enough */
-	if (samples < 5) {
+	/* wait until we have seen plenty of frames */
+	if (samples < 10) {
 		return false;
 	}
 
@@ -348,9 +350,12 @@ dsm_guess_format(bool reset)
 	return false;
 }
 
-int
-dsm_config(int fd)
+int dsm_config(int fd)
 {
+#ifdef SPEKTRUM_POWER_CONFIG
+	// Enable power controls for Spektrum receiver
+	SPEKTRUM_POWER_CONFIG();
+#endif
 #ifdef SPEKTRUM_POWER
 	// enable power on DSM connector
 	SPEKTRUM_POWER(true);
@@ -381,8 +386,7 @@ dsm_config(int fd)
 	return ret;
 }
 
-void
-dsm_proto_init()
+void dsm_proto_init()
 {
 	dsm_channel_shift = 0;
 	dsm_frame_drops = 0;
@@ -401,10 +405,8 @@ dsm_proto_init()
  *
  * @param[in] device Device name of DSM UART
  */
-int
-dsm_init(const char *device)
+int dsm_init(const char *device)
 {
-
 	if (dsm_fd < 0) {
 		dsm_fd = open(device, O_RDWR | O_NONBLOCK);
 	}
@@ -421,9 +423,13 @@ dsm_init(const char *device)
 	}
 }
 
-void
-dsm_deinit()
+void dsm_deinit()
 {
+#ifdef SPEKTRUM_POWER_PASSIVE
+	// Turn power controls to passive
+	SPEKTRUM_POWER_PASSIVE();
+#endif
+
 	if (dsm_fd >= 0) {
 		close(dsm_fd);
 	}
@@ -438,37 +444,44 @@ dsm_deinit()
  * @param[in] cmd commands - dsm_bind_power_down, dsm_bind_power_up, dsm_bind_set_rx_out, dsm_bind_send_pulses, dsm_bind_reinit_uart
  * @param[in] pulses Number of pulses for dsm_bind_send_pulses command
  */
-void
-dsm_bind(uint16_t cmd, int pulses)
+void dsm_bind(uint16_t cmd, int pulses)
 {
 	if (dsm_fd < 0) {
 		return;
 	}
 
 	switch (cmd) {
-
 	case DSM_CMD_BIND_POWER_DOWN:
-
-		/*power down DSM satellite*/
+		// power down DSM satellite
+#if defined(DSM_DEBUG)
+		printf("DSM: DSM_CMD_BIND_POWER_DOWN\n");
+#endif
 		SPEKTRUM_POWER(false);
 		break;
 
 	case DSM_CMD_BIND_POWER_UP:
-
-		/*power up DSM satellite*/
+		// power up DSM satellite
+#if defined(DSM_DEBUG)
+		printf("DSM: DSM_CMD_BIND_POWER_UP\n");
+#endif
 		SPEKTRUM_POWER(true);
 		dsm_guess_format(true);
 		break;
 
 	case DSM_CMD_BIND_SET_RX_OUT:
-
-		/*Set UART RX pin to active output mode*/
+		// Set UART RX pin to active output mode
+#if defined(DSM_DEBUG)
+		printf("DSM: DSM_CMD_BIND_SET_RX_OUT\n");
+#endif
 		SPEKTRUM_RX_AS_GPIO_OUTPUT();
 		break;
 
 	case DSM_CMD_BIND_SEND_PULSES:
+		// Pulse RX pin a number of times
+#if defined(DSM_DEBUG)
+		printf("DSM: DSM_CMD_BIND_SEND_PULSES\n");
+#endif
 
-		/*Pulse RX pin a number of times*/
 		for (int i = 0; i < pulses; i++) {
 			dsm_udelay(120);
 			SPEKTRUM_OUT(false);
@@ -479,8 +492,10 @@ dsm_bind(uint16_t cmd, int pulses)
 		break;
 
 	case DSM_CMD_BIND_REINIT_UART:
-
-		/*Restore USART RX pin to RS232 receive mode*/
+		// Restore USART RX pin to RS232 receive mode
+#if defined(DSM_DEBUG)
+		printf("DSM: DSM_CMD_BIND_REINIT_UART\n");
+#endif
 		SPEKTRUM_RX_AS_UART();
 		break;
 
@@ -496,9 +511,8 @@ dsm_bind(uint16_t cmd, int pulses)
  * @param[out] num_values pointer to number of raw channel values returned
  * @return true=DSM frame successfully decoded, false=no update
  */
-bool
-dsm_decode(hrt_abstime frame_time, uint16_t *values, uint16_t *num_values, bool *dsm_11_bit, unsigned max_values,
-	   int8_t *rssi_percent)
+bool dsm_decode(hrt_abstime frame_time, uint16_t *values, uint16_t *num_values, bool *dsm_11_bit, unsigned max_values,
+		int8_t *rssi_percent)
 {
 	/*
 	debug("DSM dsm_frame %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x",
@@ -587,6 +601,7 @@ dsm_decode(hrt_abstime frame_time, uint16_t *values, uint16_t *num_values, bool 
 		// abort if channel already found, no duplicate channels per DSM frame
 		if (channels_found[channel]) {
 			PX4_DEBUG("duplicate channel %d\n\n", channel);
+			dsm_guess_format(true);
 			return false;
 
 		} else {
@@ -595,6 +610,7 @@ dsm_decode(hrt_abstime frame_time, uint16_t *values, uint16_t *num_values, bool 
 
 		/* reset bit guessing state machine if the channel index is out of bounds */
 		if (channel > DSM_MAX_CHANNEL_COUNT) {
+			PX4_DEBUG("channel %d > %d (DSM_MAX_CHANNEL_COUNT)", channel, DSM_MAX_CHANNEL_COUNT);
 			dsm_guess_format(true);
 			return false;
 		}
@@ -633,16 +649,6 @@ dsm_decode(hrt_abstime frame_time, uint16_t *values, uint16_t *num_values, bool 
 		}
 
 		values[channel] = value;
-	}
-
-	/*
-	 * Spektrum likes to send junk in higher channel numbers to fill
-	 * their packets. We don't know about a 13 channel model in their TX
-	 * lines, so if we get a channel count of 13, we'll return 12 (the last
-	 * data index that is stable).
-	 */
-	if (*num_values == 13) {
-		*num_values = 12;
 	}
 
 	/* Set the 11-bit data indicator */
@@ -695,11 +701,12 @@ dsm_decode(hrt_abstime frame_time, uint16_t *values, uint16_t *num_values, bool 
  * @param[out] n_butes number of bytes read
  * @param[out] bytes pointer to the buffer of read bytes
  * @param[out] rssi value in percent, if supported, or 127
+ * @param[out] frame_drops dropped frames (indication of an unstable link)
+ * @param[in] max_values maximum number of channels the receiver can process
  * @return true=decoded raw channel values updated, false=no update
  */
-bool
-dsm_input(int fd, uint16_t *values, uint16_t *num_values, bool *dsm_11_bit, uint8_t *n_bytes, uint8_t **bytes,
-	  int8_t *rssi, unsigned max_values)
+bool dsm_input(int fd, uint16_t *values, uint16_t *num_values, bool *dsm_11_bit, uint8_t *n_bytes, uint8_t **bytes,
+	       int8_t *rssi, unsigned *frame_drops, unsigned max_values)
 {
 	/*
 	 * The S.BUS protocol doesn't provide reliable framing,
@@ -740,11 +747,9 @@ dsm_input(int fd, uint16_t *values, uint16_t *num_values, bool *dsm_11_bit, uint
 	return dsm_parse(now, &dsm_buf[0], ret, values, num_values, dsm_11_bit, &dsm_frame_drops, rssi, max_values);
 }
 
-bool
-dsm_parse(const uint64_t now, const uint8_t *frame, const unsigned len, uint16_t *values,
-	  uint16_t *num_values, bool *dsm_11_bit, unsigned *frame_drops, int8_t *rssi_percent, uint16_t max_channels)
+bool dsm_parse(const uint64_t now, const uint8_t *frame, const unsigned len, uint16_t *values,
+	       uint16_t *num_values, bool *dsm_11_bit, unsigned *frame_drops, int8_t *rssi_percent, uint16_t max_channels)
 {
-
 	/* this is set by the decoding state machine and will default to false
 	 * once everything that was decodable has been decoded.
 	 */
@@ -836,13 +841,23 @@ dsm_parse(const uint64_t now, const uint8_t *frame, const unsigned len, uint16_t
 	}
 
 	if (decode_ret) {
-		*num_values = dsm_chan_count;
+		// require stable channel count (dsm_chan_count == dsm_chan_count_prev) before considering the decode valid
+		if ((dsm_chan_count > 0) && (dsm_chan_count <= DSM_MAX_CHANNEL_COUNT) && (dsm_chan_count == dsm_chan_count_prev)) {
+			*num_values = dsm_chan_count;
+			memcpy(&values[0], &dsm_chan_buf[0], dsm_chan_count * sizeof(dsm_chan_buf[0]));
 
-		memcpy(&values[0], &dsm_chan_buf[0], dsm_chan_count * sizeof(dsm_chan_buf[0]));
+		} else {
+			decode_ret = false;
+		}
+
+		dsm_chan_count_prev = dsm_chan_count;
+
 #ifdef DSM_DEBUG
+		printf("PACKET ---------\n");
+		printf("frame drops: %u, chan #: %u\n", dsm_frame_drops, dsm_chan_count);
 
 		for (unsigned i = 0; i < dsm_chan_count; i++) {
-			printf("dsm_decode: %u: %u\n", i, values[i]);
+			printf("dsm_decode: #CH %02u: %u\n", i + 1, values[i]);
 		}
 
 #endif

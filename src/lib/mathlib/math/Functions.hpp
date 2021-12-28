@@ -41,6 +41,7 @@
 
 #include "Limits.hpp"
 
+#include <px4_platform_common/defines.h>
 #include <matrix/matrix/math.hpp>
 
 namespace math
@@ -170,6 +171,67 @@ const T gradual3(const T &value,
 	} else {
 		return gradual(value, x_middle, x_high, y_middle, y_high);
 	}
+}
+
+/*
+ * Squareroot, linear function with fixed corner point at intersection (1,1)
+ *                     /
+ *      linear        /
+ *                   /
+ * 1                /
+ *                /
+ *      sqrt     |
+ *              |
+ * 0     -------
+ *             0    1
+ */
+template<typename T>
+const T sqrt_linear(const T &value)
+{
+	if (value < static_cast<T>(0)) {
+		return static_cast<T>(0);
+
+	} else if (value < static_cast<T>(1)) {
+		return sqrtf(value);
+
+	} else {
+		return value;
+	}
+}
+
+/*
+ * Linear interpolation between 2 points a, and b.
+ * s=0 return a
+ * s=1 returns b
+ * Any value for s is valid.
+ */
+template<typename T>
+const T lerp(const T &a, const T &b, const T &s)
+{
+	return (static_cast<T>(1) - s) * a + s * b;
+}
+
+template<typename T>
+constexpr T negate(T value)
+{
+	static_assert(sizeof(T) > 2, "implement for T");
+	return -value;
+}
+
+template<>
+constexpr int16_t negate<int16_t>(int16_t value)
+{
+	return (value == INT16_MIN) ? INT16_MAX : -value;
+}
+
+inline bool isFinite(const float &value)
+{
+	return PX4_ISFINITE(value);
+}
+
+inline bool isFinite(const matrix::Vector3f &value)
+{
+	return PX4_ISFINITE(value(0)) && PX4_ISFINITE(value(1)) && PX4_ISFINITE(value(2));
 }
 
 } /* namespace math */

@@ -68,13 +68,12 @@ set(srcs
 	test_search_min.cpp
 	test_servo.c
 	test_sleep.c
-	test_smooth_z.cpp
-	test_tone.cpp
 	test_uart_baudchange.c
 	test_uart_console.c
 	test_uart_loopback.c
 	test_uart_send.c
 	test_versioning.cpp
+	test_cli.c
 	tests_main.c
 	)
 
@@ -101,6 +100,7 @@ px4_add_module(
 		-Wno-unused-variable
 		-Wno-vla-larger-than
 		-Wno-unused-but-set-parameter
+		-O2 # optimization needed to keep matrix code size reasonable
 	SRCS
 		${srcs}
 	DEPENDS

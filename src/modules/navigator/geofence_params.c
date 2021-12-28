@@ -62,18 +62,17 @@
  * @value 5 Land mode
  * @group Geofence
  */
-PARAM_DEFINE_INT32(GF_ACTION, 1);
+PARAM_DEFINE_INT32(GF_ACTION, 2);
 
 /**
  * Geofence altitude mode
  *
- * Select which altitude reference should be used
- * 0 = WGS84, 1 = AMSL
+ * Select which altitude (AMSL) source should be used for geofence calculations.
  *
  * @min 0
  * @max 1
- * @value 0 WGS84
- * @value 1 AMSL
+ * @value 0 Autopilot estimator global position altitude (GPS)
+ * @value 1 Raw barometer altitude (assuming standard atmospheric pressure)
  * @group Geofence
  */
 PARAM_DEFINE_INT32(GF_ALTMODE, 0);
