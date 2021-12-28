@@ -119,8 +119,8 @@ void DataValidatorGroup::set_equal_value_threshold(uint32_t threshold)
 	}
 }
 
-void DataValidatorGroup::put(unsigned index, uint64_t timestamp, const float val[3], uint64_t error_count,
-			     int priority)
+void DataValidatorGroup::put(unsigned index, uint64_t timestamp, const float val[3], uint32_t error_count,
+			     uint8_t priority)
 {
 
 	DataValidator *next = _first;
@@ -164,7 +164,7 @@ float *DataValidatorGroup::get_best(uint64_t timestamp, int *index)
 		/*
 		 * Switch if:
 		 * 1) the confidence is higher and priority is equal or higher
-		 * 2) the confidence is no less than 1% different and the priority is higher
+		 * 2) the confidence is less than 1% different and the priority is higher
 		 */
 		if ((((max_confidence < MIN_REGULAR_CONFIDENCE) && (confidence >= MIN_REGULAR_CONFIDENCE)) ||
 		     (confidence > max_confidence && (next->priority() >= max_priority)) ||

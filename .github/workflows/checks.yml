@@ -17,20 +17,20 @@ jobs:
         check: [
           "check_format",
           "tests",
+          "tests_coverage",
           "px4_fmu-v2_default stack_check",
           "validate_module_configs",
           "shellcheck_all",
           "NO_NINJA_BUILD=1 px4_fmu-v5_default",
           "NO_NINJA_BUILD=1 px4_sitl_default",
+          "BUILD_MICRORTPS_AGENT=1 px4_sitl_rtps",
           "airframe_metadata",
           "module_documentation",
           "parameters_metadata",
         ]
-        ubuntu_release: [
-          #bionic,
-          focal
-          ]
-    container: px4io/px4-dev-nuttx-${{ matrix.ubuntu_release }}:2020-04-01
+    container:
+      image: px4io/px4-dev-nuttx-focal:2021-04-29
+      options: --privileged --ulimit core=-1 --security-opt seccomp=unconfined
     steps:
     - uses: actions/checkout@v1
       with:
@@ -53,10 +53,20 @@ jobs:
           mkdir -p ~/.ccache
           echo "base_dir = ${GITHUB_WORKSPACE}" > ~/.ccache/ccache.conf
           echo "compression = true" >> ~/.ccache/ccache.conf
-          echo "compression_level = 6" >> ~/.ccache/ccache.conf
-          echo "max_size = 400M" >> ~/.ccache/ccache.conf
+          echo "compression_level = 5" >> ~/.ccache/ccache.conf
+          echo "max_size = 100M" >> ~/.ccache/ccache.conf
           ccache -s
           ccache -z
-
+    - name: check environment
+      run: |
+          export
+          ulimit -a
     - name: ${{matrix.check}}
       run: make ${{matrix.check}}
+    - name: upload coverage
+      if: contains(matrix.check, 'coverage')
+      uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        flags: unittests
+        file: coverage/lcov.info

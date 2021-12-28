@@ -264,10 +264,10 @@ else:
 # get ROS 2 version, if exists
 ros2_distro = ''
 ros_version = os.environ.get('ROS_VERSION')
-if ros_version == '2' :
+if ros_version == '2':
     if args.ros2_distro != '':
         ros2_distro = args.ros2_distro
-    else :
+    else:
         ros2_distro = os.environ.get('ROS_DISTRO')
 
 # get FastRTPS version
@@ -414,7 +414,7 @@ def generate_agent(out_dir):
     px_generate_uorb_topic_files.generate_uRTPS_general(classifier.msgs_to_send, classifier.alias_msgs_to_send, classifier.msgs_to_receive, classifier.alias_msgs_to_receive, msg_dir, out_dir,
                                                         urtps_templates_dir, package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_id_map, fastrtps_version, ros2_distro, uRTPS_AGENT_TOPICS_SRC_TEMPL_FILE)
     if cmakelists:
-        px_generate_uorb_topic_files.generate_uRTPS_general(classifier.msgs_to_send, classifier.alias_msgs_to_send, classifier.msgs_to_receive, classifier.alias_msgs_to_receive, msg_dir, out_dir,
+        px_generate_uorb_topic_files.generate_uRTPS_general(classifier.msgs_to_send, classifier.alias_msgs_to_send, classifier.msgs_to_receive, classifier.alias_msgs_to_receive, msg_dir, os.path.dirname(out_dir),
                                                             urtps_templates_dir, package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_id_map, fastrtps_version, ros2_distro, uRTPS_AGENT_CMAKELISTS_TEMPL_FILE)
 
     # Final steps to install agent
@@ -428,7 +428,7 @@ def generate_agent(out_dir):
     # the '-typeros2' option in fastrtpsgen.
     # .. note:: This is only available in FastRTPSGen 1.0.4 and above
     gen_ros2_typename = ""
-    if ros2_distro and ros2_distro in ['dashing', 'eloquent', 'foxy'] and fastrtpsgen_version >= version.Version("1.0.4"):
+    if ros2_distro and ros2_distro in ['dashing', 'eloquent', 'foxy', 'galactic', 'rolling'] and fastrtpsgen_version >= version.Version("1.0.4"):
         gen_ros2_typename = "-typeros2 "
 
     for idl_file in glob.glob(os.path.join(idl_dir, "*.idl")):
@@ -450,10 +450,10 @@ def generate_agent(out_dir):
     cp_wildcard(os.path.join(urtps_templates_dir,
                              "microRTPS_transport.*"), agent_out_dir)
     if cmakelists:
-        os.rename(os.path.join(out_dir, "microRTPS_agent_CMakeLists.txt"),
-                  os.path.join(out_dir, "CMakeLists.txt"))
+        os.rename(os.path.join(os.path.dirname(out_dir), "microRTPS_agent_CMakeLists.txt"),
+                  os.path.join(os.path.dirname(out_dir), "CMakeLists.txt"))
     if (mkdir_build):
-        mkdir_p(os.path.join(out_dir, "build"))
+        mkdir_p(os.path.join(os.path.dirname(out_dir), "build"))
     os.chdir(prev_cwd_path)
     return 0
 

@@ -45,8 +45,8 @@ ICM40609D::ICM40609D(I2CSPIBusOption bus_option, int bus, uint32_t device, enum 
 	SPI(DRV_IMU_DEVTYPE_ICM40609D, MODULE_NAME, bus, device, spi_mode, bus_frequency),
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
 	_drdy_gpio(drdy_gpio),
-	_px4_accel(get_device_id(), ORB_PRIO_HIGH, rotation),
-	_px4_gyro(get_device_id(), ORB_PRIO_HIGH, rotation)
+	_px4_accel(get_device_id(), rotation),
+	_px4_gyro(get_device_id(), rotation)
 {
 	if (drdy_gpio != 0) {
 		_drdy_missed_perf = perf_alloc(PC_COUNT, MODULE_NAME": DRDY missed");
@@ -338,10 +338,6 @@ void ICM40609D::ConfigureGyro()
 
 void ICM40609D::ConfigureSampleRate(int sample_rate)
 {
-	if (sample_rate == 0) {
-		sample_rate = 800; // default to 800 Hz
-	}
-
 	// round down to nearest FIFO sample dt
 	const float min_interval = FIFO_SAMPLE_DT;
 	_fifo_empty_interval_us = math::max(roundf((1e6f / (float)sample_rate) / min_interval) * min_interval, min_interval);

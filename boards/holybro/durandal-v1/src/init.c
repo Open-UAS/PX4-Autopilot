@@ -52,6 +52,7 @@
 #include <string.h>
 #include <debug.h>
 #include <errno.h>
+#include <syslog.h>
 
 #include <nuttx/config.h>
 #include <nuttx/board.h>
@@ -63,7 +64,7 @@
 #include <chip.h>
 #include <stm32_uart.h>
 #include <arch/board/board.h>
-#include "up_internal.h"
+#include "arm_internal.h"
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_board_led.h>
@@ -74,6 +75,8 @@
 #include <px4_platform/board_determine_hw_info.h>
 #include <px4_platform/board_dma_alloc.h>
 
+#include <mpu.h>
+
 /****************************************************************************
  * Pre-Processor Definitions
  ****************************************************************************/
@@ -81,7 +84,7 @@
 /* Configuration ************************************************************/
 
 /*
- * Ideally we'd be able to get these from up_internal.h,
+ * Ideally we'd be able to get these from arm_internal.h,
  * but since we want to be able to disable the NuttX use
  * of leds for system indication at will and there is no
  * separate switch, we need to build independent of the
@@ -159,6 +162,16 @@ __EXPORT void board_on_reset(int status)
 __EXPORT void
 stm32_boardinitialize(void)
 {
+	// clear all existing MPU configuration from bootloader
+	for (int region = 0; region < CONFIG_ARM_MPU_NREGIONS; region++) {
+		putreg32(region, MPU_RNR);
+		putreg32(0, MPU_RBAR);
+		putreg32(0, MPU_RASR);
+
+		// save
+		putreg32(0, MPU_CTRL);
+	}
+
 	board_on_reset(-1); /* Reset PWM first thing */
 
 	/* configure LEDs */
@@ -279,6 +292,10 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	}
 
 #endif /* CONFIG_MMCSD */
+
+	/* Configure the HW based on the manifest */
+
+	px4_platform_configure();
 
 	return OK;
 }

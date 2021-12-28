@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016, 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -53,6 +53,7 @@
 
 #include <drivers/drv_hrt.h>
 #include <mathlib/math/Limits.hpp>
+#include <px4_platform/cpuload.h>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/posix.h>
@@ -1120,7 +1121,7 @@ int Logger::create_log_dir(LogType type, tm *tt, char *log_dir, int log_dir_len)
 		/* look for the next dir that does not exist */
 		while (!file_name.has_log_dir) {
 			/* format log dir: e.g. /fs/microsd/log/sess001 */
-			int n2 = snprintf(file_name.log_dir, sizeof(LogFileName::log_dir), "sess%03u", dir_number);
+			int n2 = snprintf(file_name.log_dir, sizeof(LogFileName::log_dir), "sess%03" PRIu16, dir_number);
 
 			if (n2 >= (int)sizeof(LogFileName::log_dir)) {
 				PX4_ERR("log path too long (%i)", n);
@@ -1191,7 +1192,7 @@ int Logger::get_log_file_name(LogType type, char *file_name, size_t file_name_si
 		/* look for the next file that does not exist */
 		while (file_number <= MAX_NO_LOGFILE) {
 			/* format log file path: e.g. /fs/microsd/log/sess001/log001.ulg */
-			snprintf(log_file_name, sizeof(LogFileName::log_file_name), "log%03u%s.ulg", file_number, replay_suffix);
+			snprintf(log_file_name, sizeof(LogFileName::log_file_name), "log%03" PRIu16 "%s.ulg", file_number, replay_suffix);
 			snprintf(file_name + n, file_name_size - n, "/%s", log_file_name);
 
 			if (!util::file_exist(file_name)) {
@@ -1225,6 +1226,11 @@ void Logger::start_log_file(LogType type)
 		return;
 	}
 
+	if (type == LogType::Full) {
+		// initialize cpu load as early as possible to get more data
+		initialize_load_output(PrintLoadReason::Preflight);
+	}
+
 	PX4_INFO("Start file log (type: %s)", log_type_str(type));
 
 	char file_name[LOG_DIR_LEN] = "";
@@ -1248,6 +1254,7 @@ void Logger::start_log_file(LogType type)
 
 	if (type == LogType::Full) {
 		write_parameters(type);
+		write_parameter_defaults(type);
 		write_perf_data(true);
 		write_console_output();
 	}
@@ -1260,8 +1267,6 @@ void Logger::start_log_file(LogType type)
 	if (type == LogType::Full) {
 		/* reset performance counters to get in-flight min and max values in post flight log */
 		perf_reset_all();
-
-		initialize_load_output(PrintLoadReason::Preflight);
 	}
 
 	_statistics[(int)type].start_time_file = hrt_absolute_time();
@@ -1289,6 +1294,9 @@ void Logger::start_log_mavlink()
 		return;
 	}
 
+	// initialize cpu load as early as possible to get more data
+	initialize_load_output(PrintLoadReason::Preflight);
+
 	PX4_INFO("Start mavlink log");
 
 	_writer.start_log_mavlink();
@@ -1298,14 +1306,13 @@ void Logger::start_log_mavlink()
 	write_version(LogType::Full);
 	write_formats(LogType::Full);
 	write_parameters(LogType::Full);
+	write_parameter_defaults(LogType::Full);
 	write_perf_data(true);
 	write_console_output();
 	write_all_add_logged_msg(LogType::Full);
 	_writer.set_need_reliable_transfer(false);
 	_writer.unselect_write_backend();
 	_writer.notify();
-
-	initialize_load_output(PrintLoadReason::Preflight);
 }
 
 void Logger::stop_log_mavlink()
@@ -1388,16 +1395,8 @@ void Logger::print_load_callback(void *user)
 
 void Logger::initialize_load_output(PrintLoadReason reason)
 {
-	perf_callback_data_t callback_data;
-	callback_data.logger = this;
-	callback_data.counter = 0;
-	callback_data.buffer = nullptr;
-	char buffer[140];
-	hrt_abstime curr_time = hrt_absolute_time();
-	init_print_load_s(curr_time, &_load);
-	// this will not yet print anything
-	print_load_buffer(curr_time, buffer, sizeof(buffer), print_load_callback, &callback_data, &_load);
-	_next_load_print = curr_time + 1000000;
+	init_print_load(&_load);
+	_next_load_print = hrt_absolute_time() + 1_s;
 	_print_load_reason = reason;
 }
 
@@ -1412,11 +1411,11 @@ void Logger::write_load_output()
 	callback_data.logger = this;
 	callback_data.counter = 0;
 	callback_data.buffer = buffer;
-	hrt_abstime curr_time = hrt_absolute_time();
 	_writer.set_need_reliable_transfer(true);
 	// TODO: maybe we should restrict the output to a selected backend (eg. when file logging is running
 	// and mavlink log is started, this will be added to the file as well)
-	print_load_buffer(curr_time, buffer, sizeof(buffer), print_load_callback, &callback_data, &_load);
+	print_load_buffer(buffer, sizeof(buffer), print_load_callback, &callback_data, &_load);
+	cpuload_monitor_stop();
 	_writer.set_need_reliable_transfer(false);
 }
 
@@ -1683,7 +1682,7 @@ void Logger::write_info_multiple(LogType type, const char *name, const char *val
 		write_message(type, buffer, msg_size);
 
 	} else {
-		PX4_ERR("info_multiple str too long (%i), key=%s", msg.key_len, msg.key);
+		PX4_ERR("info_multiple str too long (%" PRIu8 "), key=%s", msg.key_len, msg.key);
 	}
 
 	_writer.unlock();
@@ -1741,6 +1740,8 @@ void Logger::write_header(LogType type)
 	// write the Flags message: this MUST be written right after the ulog header
 	ulog_message_flag_bits_s flag_bits{};
 
+	flag_bits.compat_flags[0] = ULOG_COMPAT_FLAG0_DEFAULT_PARAMETERS_MASK;
+
 	flag_bits.msg_size = sizeof(flag_bits) - ULOG_MSG_HEADER_LEN;
 	flag_bits.msg_type = static_cast<uint8_t>(ULogMessageType::FLAG_BITS);
 
@@ -1780,6 +1781,13 @@ void Logger::write_version(LogType type)
 		write_info(type, "sys_os_ver", os_version);
 	}
 
+	const char *oem_version = px4_firmware_oem_version_string();
+
+	if (oem_version && oem_version[0]) {
+		write_info(type, "ver_oem", oem_version);
+	}
+
+
 	write_info(type, "sys_os_ver_release", px4_os_version());
 	write_info(type, "sys_toolchain", px4_toolchain_name());
 	write_info(type, "sys_toolchain_ver", px4_toolchain_version());
@@ -1801,7 +1809,7 @@ void Logger::write_version(LogType type)
 
 	// data versioning: increase this on every larger data change (format/semantic)
 	// 1: switch to FIFO drivers (disabled on-chip DLPF)
-	write_info(type, "ver_data_format", 1);
+	write_info(type, "ver_data_format", static_cast<uint32_t>(1));
 
 #ifndef BOARD_HAS_NO_UUID
 
@@ -1825,6 +1833,100 @@ void Logger::write_version(LogType type)
 	}
 }
 
+void Logger::write_parameter_defaults(LogType type)
+{
+	_writer.lock();
+	ulog_message_parameter_default_header_s msg = {};
+	uint8_t *buffer = reinterpret_cast<uint8_t *>(&msg);
+
+	msg.msg_type = static_cast<uint8_t>(ULogMessageType::PARAMETER_DEFAULT);
+	int param_idx = 0;
+	param_t param = 0;
+
+	do {
+		// skip over all parameters which are not used
+		do {
+			param = param_for_index(param_idx);
+			++param_idx;
+		} while (param != PARAM_INVALID && !param_used(param));
+
+		// save parameters which are valid AND used AND not volatile
+		if (param != PARAM_INVALID) {
+
+			if (param_is_volatile(param)) {
+				continue;
+			}
+
+			// get parameter type and size
+			const char *type_str;
+			param_type_t ptype = param_type(param);
+			size_t value_size = 0;
+
+			uint8_t default_value[math::max(sizeof(float), sizeof(int32_t))];
+			uint8_t system_default_value[sizeof(default_value)];
+			uint8_t value[sizeof(default_value)];
+
+			switch (ptype) {
+			case PARAM_TYPE_INT32:
+				type_str = "int32_t";
+				value_size = sizeof(int32_t);
+				param_get(param, (int32_t *)&value);
+				break;
+
+			case PARAM_TYPE_FLOAT:
+				type_str = "float";
+				value_size = sizeof(float);
+				param_get(param, (float *)&value);
+				break;
+
+			default:
+				continue;
+			}
+
+			// format parameter key (type and name)
+			msg.key_len = snprintf(msg.key, sizeof(msg.key), "%s %s", type_str, param_name(param));
+			size_t msg_size = sizeof(msg) - sizeof(msg.key) + msg.key_len;
+
+			if (param_get_default_value(param, &default_value) != 0) {
+				continue;
+			}
+
+			if (param_get_system_default_value(param, &system_default_value) != 0) {
+				continue;
+			}
+
+			msg_size += value_size;
+			msg.msg_size = msg_size - ULOG_MSG_HEADER_LEN;
+
+			// write the system/airframe default if different from the current value
+			if (memcmp(&system_default_value, &default_value, value_size) == 0) {
+				// if the system and airframe defaults are equal, we can combine them
+				if (memcmp(&value, &default_value, value_size) != 0) {
+					memcpy(&buffer[msg_size - value_size], default_value, value_size);
+					msg.default_types = ulog_parameter_default_type_t::current_setup | ulog_parameter_default_type_t::system;
+					write_message(type, buffer, msg_size);
+				}
+
+			} else {
+				if (memcmp(&value, &default_value, value_size) != 0) {
+					memcpy(&buffer[msg_size - value_size], default_value, value_size);
+					msg.default_types = ulog_parameter_default_type_t::current_setup;
+					write_message(type, buffer, msg_size);
+				}
+
+				if (memcmp(&value, &system_default_value, value_size) != 0) {
+					memcpy(&buffer[msg_size - value_size], system_default_value, value_size);
+					msg.default_types = ulog_parameter_default_type_t::system;
+					write_message(type, buffer, msg_size);
+				}
+			}
+		}
+	} while ((param != PARAM_INVALID) && (param_idx < (int) param_count()));
+
+	_writer.unlock();
+	_writer.notify();
+}
+
 void Logger::write_parameters(LogType type)
 {
 	_writer.lock();
@@ -1836,7 +1938,7 @@ void Logger::write_parameters(LogType type)
 	param_t param = 0;
 
 	do {
-		// skip over all parameters which are not invalid and not used
+		// skip over all parameters which are not used
 		do {
 			param = param_for_index(param_idx);
 			++param_idx;
@@ -1905,7 +2007,7 @@ void Logger::write_changed_parameters(LogType type)
 	param_t param = 0;
 
 	do {
-		// skip over all parameters which are not invalid and not used
+		// skip over all parameters which are not used
 		do {
 			param = param_for_index(param_idx);
 			++param_idx;
@@ -1974,7 +2076,7 @@ void Logger::ack_vehicle_command(vehicle_command_s *cmd, uint32_t result)
 	vehicle_command_ack.target_system = cmd->source_system;
 	vehicle_command_ack.target_component = cmd->source_component;
 
-	uORB::PublicationQueued<vehicle_command_ack_s> cmd_ack_pub{ORB_ID(vehicle_command_ack)};
+	uORB::Publication<vehicle_command_ack_s> cmd_ack_pub{ORB_ID(vehicle_command_ack)};
 	cmd_ack_pub.publish(vehicle_command_ack);
 }
 

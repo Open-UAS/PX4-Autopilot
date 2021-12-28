@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2018, 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -68,9 +68,6 @@ CameraCapture::CameraCapture() :
 
 CameraCapture::~CameraCapture()
 {
-	/* free any existing reports */
-	delete _trig_buffer;
-
 	camera_capture::g_camera_capture = nullptr;
 }
 
@@ -267,7 +264,7 @@ CameraCapture::set_capture_control(bool enabled)
 		_gpio_capture = false;
 
 	} else {
-		PX4_ERR("Unable to set capture callback for chan %u\n", conf.channel);
+		PX4_ERR("Unable to set capture callback for chan %" PRIu8 "\n", conf.channel);
 		_capture_enabled = false;
 		goto err_out;
 	}
@@ -295,13 +292,6 @@ CameraCapture::reset_statistics(bool reset_seq)
 int
 CameraCapture::start()
 {
-	/* allocate basic report buffers */
-	_trig_buffer = new ringbuffer::RingBuffer(2, sizeof(_trig_s));
-
-	if (_trig_buffer == nullptr) {
-		return PX4_ERROR;
-	}
-
 	// run every 100 ms (10 Hz)
 	ScheduleOnInterval(100000, 10000);
 
@@ -324,7 +314,7 @@ void
 CameraCapture::status()
 {
 	PX4_INFO("Capture enabled : %s", _capture_enabled ? "YES" : "NO");
-	PX4_INFO("Frame sequence : %u", _capture_seq);
+	PX4_INFO("Frame sequence : %" PRIu32, _capture_seq);
 
 	if (_last_trig_time != 0) {
 		PX4_INFO("Last trigger timestamp : %" PRIu64 " (%i ms ago)", _last_trig_time,
@@ -338,7 +328,7 @@ CameraCapture::status()
 		PX4_INFO("Last exposure time : %0.2f ms", double(_last_exposure_time) / 1000.0);
 	}
 
-	PX4_INFO("Number of overflows : %u", _capture_overflows);
+	PX4_INFO("Number of overflows : %" PRIu32, _capture_overflows);
 }
 
 static int usage()

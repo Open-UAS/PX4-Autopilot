@@ -80,23 +80,14 @@ extern int test_rc(int argc, char *argv[]);
 extern int test_search_min(int argc, char *argv[]);
 extern int test_servo(int argc, char *argv[]);
 extern int test_sleep(int argc, char *argv[]);
-extern int test_smooth_z(int argc, char *argv[]);
 extern int test_time(int argc, char *argv[]);
-extern int test_tone(int argc, char *argv[]);
 extern int test_uart_baudchange(int argc, char *argv[]);
 extern int test_uart_break(int argc, char *argv[]);
 extern int test_uart_console(int argc, char *argv[]);
 extern int test_uart_loopback(int argc, char *argv[]);
 extern int test_uart_send(int argc, char *argv[]);
 extern int test_versioning(int argc, char *argv[]);
-
-/* external */
-extern int commander_tests_main(int argc, char *argv[]);
-extern int mavlink_tests_main(int argc, char *argv[]);
-extern int controllib_test_main(int argc, char *argv[]);
-extern int uorb_tests_main(int argc, char *argv[]);
-extern int rc_tests_main(int argc, char *argv[]);
-extern int sf0x_tests_main(int argc, char *argv[]);
+extern int test_cli(int argc, char *argv[]);
 
 __END_DECLS
 

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013, 2014 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013, 2014, 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -53,7 +53,6 @@
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/i2c_spi_buses.h>
-#include <uORB/topics/system_power.h>
 
 #include <drivers/airspeed/airspeed.h>
 
@@ -93,15 +92,7 @@ protected:
 	int	measure() override;
 	int	collect() override;
 
-	math::LowPassFilter2p	_filter{MEAS_RATE, MEAS_DRIVER_FILTER_FREQ};
-
-	/**
-	 * Correct for 5V rail voltage variations
-	 */
-	void voltage_correction(float &diff_pres_pa, float &temperature);
-
-	int _t_system_power{-1};
-	system_power_s system_power{};
+	math::LowPassFilter2p<float> _filter{MEAS_RATE, MEAS_DRIVER_FILTER_FREQ};
 };
 
 /*
@@ -199,25 +190,24 @@ MEASAirspeed::collect()
 	float diff_press_PSI = -((dp_raw - 0.1f * 16383) * (P_max - P_min) / (0.8f * 16383) + P_min);
 	float diff_press_pa_raw = diff_press_PSI * PSI_to_Pa;
 
-	// correct for 5V rail voltage if possible
-	voltage_correction(diff_press_pa_raw, temperature);
-
 	/*
 	  With the above calculation the MS4525 sensor will produce a
 	  positive number when the top port is used as a dynamic port
 	  and bottom port is used as the static port
 	 */
 
-	differential_pressure_s report{};
+	if (PX4_ISFINITE(diff_press_pa_raw)) {
+		differential_pressure_s report{};
 
-	report.timestamp = hrt_absolute_time();
-	report.error_count = perf_event_count(_comms_errors);
-	report.temperature = temperature;
-	report.differential_pressure_filtered_pa =  _filter.apply(diff_press_pa_raw) - _diff_pres_offset;
-	report.differential_pressure_raw_pa = diff_press_pa_raw - _diff_pres_offset;
-	report.device_id = _device_id.devid;
+		report.error_count = perf_event_count(_comms_errors);
+		report.temperature = temperature;
+		report.differential_pressure_filtered_pa = _filter.apply(diff_press_pa_raw) - _diff_pres_offset;
+		report.differential_pressure_raw_pa = diff_press_pa_raw - _diff_pres_offset;
+		report.device_id = _device_id.devid;
+		report.timestamp = hrt_absolute_time();
 
-	_airspeed_pub.publish(report);
+		_airspeed_pub.publish(report);
+	}
 
 	ret = OK;
 
@@ -276,73 +266,6 @@ MEASAirspeed::RunImpl()
 	ScheduleDelayed(CONVERSION_INTERVAL);
 }
 
-/**
-   correct for 5V rail voltage if the system_power ORB topic is
-   available
-
-   See http://uav.tridgell.net/MS4525/MS4525-offset.png for a graph of
-   offset versus voltage for 3 sensors
- */
-void
-MEASAirspeed::voltage_correction(float &diff_press_pa, float &temperature)
-{
-#if defined(ADC_SCALED_V5_SENSE)
-
-	if (_t_system_power == -1) {
-		_t_system_power = orb_subscribe(ORB_ID(system_power));
-	}
-
-	if (_t_system_power == -1) {
-		// not available
-		return;
-	}
-
-	bool updated = false;
-	orb_check(_t_system_power, &updated);
-
-	if (updated) {
-		orb_copy(ORB_ID(system_power), _t_system_power, &system_power);
-	}
-
-	if (system_power.voltage5v_v < 3.0f || system_power.voltage5v_v > 6.0f) {
-		// not valid, skip correction
-		return;
-	}
-
-	const float slope = 65.0f;
-	/*
-	  apply a piecewise linear correction, flattening at 0.5V from 5V
-	 */
-	float voltage_diff = system_power.voltage5v_v - 5.0f;
-
-	if (voltage_diff > 0.5f) {
-		voltage_diff = 0.5f;
-	}
-
-	if (voltage_diff < -0.5f) {
-		voltage_diff = -0.5f;
-	}
-
-	diff_press_pa -= voltage_diff * slope;
-
-	/*
-	  the temperature masurement varies as well
-	 */
-	const float temp_slope = 0.887f;
-	voltage_diff = system_power.voltage5v_v - 5.0f;
-
-	if (voltage_diff > 0.5f) {
-		voltage_diff = 0.5f;
-	}
-
-	if (voltage_diff < -1.0f) {
-		voltage_diff = -1.0f;
-	}
-
-	temperature -= voltage_diff * temp_slope;
-#endif // defined(ADC_SCALED_V5_SENSE)
-}
-
 I2CSPIDriverBase *MEASAirspeed::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
 		int runtime_instance)
 {
@@ -384,15 +307,15 @@ ms4525_airspeed_main(int argc, char *argv[])
 	cli.default_i2c_frequency = 100000;
 	int device_type = DEVICE_TYPE_MS4525;
 
-	while ((ch = cli.getopt(argc, argv, "T:")) != EOF) {
+	while ((ch = cli.getOpt(argc, argv, "T:")) != EOF) {
 		switch (ch) {
 		case 'T':
-			device_type = atoi(cli.optarg());
+			device_type = atoi(cli.optArg());
 			break;
 		}
 	}
 
-	const char *verb = cli.optarg();
+	const char *verb = cli.optArg();
 
 	if (!verb) {
 		ThisDriver::print_usage();

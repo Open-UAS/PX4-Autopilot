@@ -43,12 +43,14 @@
 
 #include "board_config.h"
 
+#include <syslog.h>
+
 #include <nuttx/config.h>
 #include <nuttx/board.h>
 #include <nuttx/sdio.h>
 #include <nuttx/mmcsd.h>
 #include <arch/board/board.h>
-#include "up_internal.h"
+#include "arm_internal.h"
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_board_led.h>
@@ -57,6 +59,8 @@
 #include <px4_platform_common/init.h>
 #include <px4_platform/gpio.h>
 #include <px4_platform/board_dma_alloc.h>
+
+#include <mpu.h>
 
 __BEGIN_DECLS
 extern void led_init(void);
@@ -116,6 +120,16 @@ __EXPORT void board_on_reset(int status)
  ************************************************************************************/
 __EXPORT void stm32_boardinitialize(void)
 {
+	// clear all existing MPU configuration from bootloader
+	for (int region = 0; region < CONFIG_ARM_MPU_NREGIONS; region++) {
+		putreg32(region, MPU_RNR);
+		putreg32(0, MPU_RBAR);
+		putreg32(0, MPU_RASR);
+
+		// save
+		putreg32(0, MPU_CTRL);
+	}
+
 	/* Reset PWM first thing */
 	board_on_reset(-1);
 
@@ -188,6 +202,10 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	/* Assume that the SD card is inserted.  What choice do we have? */
 	sdio_mediachange(sdio_dev, true);
 #endif /* CONFIG_MMCSD */
+
+	/* Configure the HW based on the manifest */
+
+	px4_platform_configure();
 
 	return OK;
 }

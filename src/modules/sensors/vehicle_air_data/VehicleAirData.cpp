@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,7 +40,6 @@ namespace sensors
 {
 
 using namespace matrix;
-using namespace time_literals;
 
 static constexpr uint32_t SENSOR_TIMEOUT{300_ms};
 
@@ -98,6 +97,10 @@ void VehicleAirData::SensorCorrectionsUpdate(bool force)
 							case 2:
 								_thermal_offset[baro_index] = corrections.baro_offset_2;
 								break;
+
+							case 3:
+								_thermal_offset[baro_index] = corrections.baro_offset_3;
+								break;
 							}
 						}
 					}
@@ -107,13 +110,29 @@ void VehicleAirData::SensorCorrectionsUpdate(bool force)
 	}
 }
 
+void VehicleAirData::AirTemperatureUpdate()
+{
+	differential_pressure_s differential_pressure;
+
+	static constexpr float temperature_min_celsius = -20.f;
+	static constexpr float temperature_max_celsius = 35.f;
+
+	// update air temperature if data from differential pressure sensor is finite and not exactly 0
+	// limit the range to max 35°C to limt the error due to heated up airspeed sensors prior flight
+	if (_differential_pressure_sub.update(&differential_pressure) && PX4_ISFINITE(differential_pressure.temperature)
+	    && fabsf(differential_pressure.temperature) > FLT_EPSILON) {
+		_air_temperature_celsius = math::constrain(differential_pressure.temperature, temperature_min_celsius,
+					   temperature_max_celsius);
+	}
+}
+
 void VehicleAirData::ParametersUpdate()
 {
 	// Check if parameters have changed
-	if (_params_sub.updated()) {
+	if (_parameter_update_sub.updated()) {
 		// clear update
 		parameter_update_s param_update;
-		_params_sub.copy(&param_update);
+		_parameter_update_sub.copy(&param_update);
 
 		updateParams();
 	}
@@ -127,13 +146,15 @@ void VehicleAirData::Run()
 
 	SensorCorrectionsUpdate();
 
+	AirTemperatureUpdate();
+
 	bool updated[MAX_SENSOR_COUNT] {};
 
 	for (int uorb_index = 0; uorb_index < MAX_SENSOR_COUNT; uorb_index++) {
 
 		if (!_advertised[uorb_index]) {
 			// use data's timestamp to throttle advertisement checks
-			if (hrt_elapsed_time(&_last_data[uorb_index].timestamp) > 1_s) {
+			if ((_last_data[uorb_index].timestamp == 0) || (hrt_elapsed_time(&_last_data[uorb_index].timestamp) > 1_s)) {
 				if (_sensor_sub[uorb_index].advertised()) {
 					if (uorb_index > 0) {
 						/* the first always exists, but for each further sensor, add a new validator */
@@ -147,20 +168,20 @@ void VehicleAirData::Run()
 					// force temperature correction update
 					SensorCorrectionsUpdate(true);
 
+					if (_selected_sensor_sub_index < 0) {
+						_sensor_sub[uorb_index].registerCallback();
+					}
+
 				} else {
 					_last_data[uorb_index].timestamp = hrt_absolute_time();
 				}
 			}
+		}
 
-		} else {
+		if (_advertised[uorb_index]) {
 			updated[uorb_index] = _sensor_sub[uorb_index].update(&_last_data[uorb_index]);
 
 			if (updated[uorb_index]) {
-				if (_priority[uorb_index] == 0) {
-					// set initial priority
-					_priority[uorb_index] = _sensor_sub[uorb_index].get_priority();
-				}
-
 				// millibar to Pa
 				const float raw_pressure_pascals = _last_data[uorb_index].pressure * 100.f;
 
@@ -186,7 +207,7 @@ void VehicleAirData::Run()
 			}
 
 			if (_selected_sensor_sub_index >= 0) {
-				PX4_INFO("%s switch from #%u -> #%d", "BARO", _selected_sensor_sub_index, best_index);
+				PX4_INFO("%s switch from #%" PRIu8 " -> #%d", "BARO", _selected_sensor_sub_index, best_index);
 			}
 
 			_selected_sensor_sub_index = best_index;
@@ -205,7 +226,8 @@ void VehicleAirData::Run()
 		_baro_sum_count++;
 
 		if ((_param_sens_baro_rate.get() > 0)
-		    && hrt_elapsed_time(&_last_publication_timestamp) >= (1e6f / _param_sens_baro_rate.get())) {
+		    && ((_last_publication_timestamp == 0)
+			|| (hrt_elapsed_time(&_last_publication_timestamp) >= (1e6f / _param_sens_baro_rate.get())))) {
 
 			const float pressure = _baro_sum / _baro_sum_count;
 			const hrt_abstime timestamp_sample = _baro_timestamp_sum / _baro_sum_count;
@@ -246,12 +268,8 @@ void VehicleAirData::Run()
 			out.baro_alt_meter = (((powf((p / p1), (-(a * CONSTANTS_AIR_GAS_CONST) / CONSTANTS_ONE_G))) * T1) - T1) / a;
 
 			// calculate air density
-			// estimate air density assuming typical 20degC ambient temperature
-			// TODO: use air temperature if available (differential pressure sensors)
-			static constexpr float pressure_to_density = 1.0f / (CONSTANTS_AIR_GAS_CONST * (20.0f -
-					CONSTANTS_ABSOLUTE_NULL_CELSIUS));
-
-			out.rho = pressure_to_density * out.baro_pressure_pa;
+			out.rho = out.baro_pressure_pa  / (CONSTANTS_AIR_GAS_CONST * (_air_temperature_celsius -
+							   CONSTANTS_ABSOLUTE_NULL_CELSIUS));
 
 			out.timestamp = hrt_absolute_time();
 			_vehicle_air_data_pub.publish(out);
@@ -282,7 +300,7 @@ void VehicleAirData::Run()
 				}
 
 				// reduce priority of failed sensor to the minimum
-				_priority[failover_index] = ORB_PRIO_MIN;
+				_priority[failover_index] = 1;
 			}
 		}
 
@@ -298,10 +316,11 @@ void VehicleAirData::Run()
 void VehicleAirData::PrintStatus()
 {
 	if (_selected_sensor_sub_index >= 0) {
-		PX4_INFO("selected barometer: %d (%d)", _last_data[_selected_sensor_sub_index].device_id, _selected_sensor_sub_index);
+		PX4_INFO("selected barometer: %" PRIu32 " (%" PRId8 ")", _last_data[_selected_sensor_sub_index].device_id,
+			 _selected_sensor_sub_index);
 
 		if (fabsf(_thermal_offset[_selected_sensor_sub_index]) > 0.f) {
-			PX4_INFO("%d temperature offset: %.4f", _last_data[_selected_sensor_sub_index].device_id,
+			PX4_INFO("%" PRIu32 " temperature offset: %.4f", _last_data[_selected_sensor_sub_index].device_id,
 				 (double)_thermal_offset[_selected_sensor_sub_index]);
 		}
 	}

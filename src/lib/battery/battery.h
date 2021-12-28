@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -69,11 +69,6 @@ public:
 	~Battery() = default;
 
 	/**
-	 * Reset all battery stats and report invalid/nothing.
-	 */
-	void reset();
-
-	/**
 	 * Get the battery cell count
 	 */
 	int cell_count() { return _params.n_cells; }
@@ -128,37 +123,30 @@ protected:
 	struct {
 		float v_empty;
 		float v_charged;
-		int n_cells;
+		int32_t  n_cells;
 		float capacity;
 		float v_load_drop;
 		float r_internal;
 		float low_thr;
 		float crit_thr;
 		float emergen_thr;
-		int source;
+		int32_t source;
 
 		// TODO: These parameters are depracated. They can be removed entirely once the
 		//  new version of Firmware has been around for long enough.
 		float v_empty_old;
 		float v_charged_old;
-		int n_cells_old;
+		int32_t  n_cells_old;
 		float capacity_old;
 		float v_load_drop_old;
 		float r_internal_old;
-		int source_old;
+		int32_t source_old;
 	} _params{};
-
-	battery_status_s _battery_status{};
 
 	const int _index;
 
 	bool _first_parameter_update{true};
 	void updateParams() override;
-
-	/**
-	 * Publishes the uORB battery_status message with the most recently-updated data.
-	 */
-	void publish();
 
 	/**
 	 * This function helps migrating and syncing from/to deprecated parameters. BAT_* BAT1_*
@@ -196,8 +184,8 @@ protected:
 
 private:
 	void sumDischarged(const hrt_abstime &timestamp, float current_a);
-	void estimateRemaining(const float voltage_v, const float current_a, const float throttle);
-	void determineWarning(bool connected);
+	void estimateStateOfCharge(const float voltage_v, const float current_a, const float throttle);
+	uint8_t determineWarning(float state_of_charge);
 	void computeScale();
 
 	uORB::PublicationMulti<battery_status_s> _battery_status_pub{ORB_ID(battery_status)};
@@ -208,8 +196,8 @@ private:
 	AlphaFilter<float> _throttle_filter;
 	float _discharged_mah{0.f};
 	float _discharged_mah_loop{0.f};
-	float _remaining_voltage{-1.f};		///< normalized battery charge level remaining based on voltage
-	float _remaining{-1.f};			///< normalized battery charge level, selected based on config param
+	float _state_of_charge_volt_based{-1.f};	// [0,1]
+	float _state_of_charge{-1.f};				// [0,1]
 	float _scale{1.f};
 	uint8_t _warning{battery_status_s::BATTERY_WARNING_NONE};
 	hrt_abstime _last_timestamp{0};

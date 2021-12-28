@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020, 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -52,6 +52,7 @@ LPS33HW::print_usage()
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(true, true);
 	PRINT_MODULE_USAGE_PARAMS_I2C_ADDRESS(0x5D);
+	PRINT_MODULE_USAGE_PARAMS_I2C_KEEP_RUNNING_FLAG();
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }
 
@@ -68,17 +69,17 @@ I2CSPIDriverBase *LPS33HW::instantiate(const BusCLIArguments &cli, const BusInst
 	}
 
 	if (interface == nullptr) {
-		PX4_ERR("failed creating interface for bus %i (devid 0x%x)", iterator.bus(), iterator.devid());
+		PX4_ERR("failed creating interface for bus %i (devid 0x%" PRIx32 ")", iterator.bus(), iterator.devid());
 		return nullptr;
 	}
 
 	if (interface->init() != OK) {
 		delete interface;
-		PX4_DEBUG("no device on bus %i (devid 0x%x)", iterator.bus(), iterator.devid());
+		PX4_DEBUG("no device on bus %i (devid 0x%" PRIx32 ")", iterator.bus(), iterator.devid());
 		return nullptr;
 	}
 
-	LPS33HW *dev = new LPS33HW(iterator.configuredBusOption(), iterator.bus(), interface);
+	LPS33HW *dev = new LPS33HW(iterator.configuredBusOption(), iterator.bus(), interface, cli.keep_running);
 
 	if (dev == nullptr) {
 		delete interface;
@@ -100,6 +101,7 @@ extern "C" int lps33hw_main(int argc, char *argv[])
 	cli.i2c_address = 0x5D;
 	cli.default_i2c_frequency = 400000;
 	cli.default_spi_frequency = 10 * 1000 * 1000;
+	cli.support_keep_running = true;
 
 	const char *verb = cli.parseDefaultArguments(argc, argv);
 

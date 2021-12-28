@@ -124,7 +124,7 @@ __EXPORT extern hrt_abstime hrt_elapsed_time_atomic(const volatile hrt_abstime *
  *
  * This function ensures that the timestamp cannot be seen half-written by an interrupt handler.
  */
-__EXPORT extern hrt_abstime hrt_store_absolute_time(volatile hrt_abstime *now);
+__EXPORT extern void hrt_store_absolute_time(volatile hrt_abstime *time);
 
 #ifdef __PX4_QURT
 /**
@@ -225,14 +225,14 @@ constexpr hrt_abstime operator "" _s(unsigned long long seconds)
 	return hrt_abstime(seconds * 1000000ULL);
 }
 
-constexpr hrt_abstime operator "" _ms(unsigned long long seconds)
+constexpr hrt_abstime operator "" _ms(unsigned long long milliseconds)
 {
-	return hrt_abstime(seconds * 1000ULL);
+	return hrt_abstime(milliseconds * 1000ULL);
 }
 
-constexpr hrt_abstime operator "" _us(unsigned long long seconds)
+constexpr hrt_abstime operator "" _us(unsigned long long microseconds)
 {
-	return hrt_abstime(seconds);
+	return hrt_abstime(microseconds);
 }
 
 } /* namespace time_literals */
