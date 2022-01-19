@@ -6,7 +6,7 @@
 # @class Plane
 #
 
-sh /etc/init.d/rc.fw_defaults
+. ${R}etc/init.d/rc.fw_defaults
 
 if [ $AUTOCNF = yes ]
 then
@@ -82,5 +82,4 @@ then
 
 fi
 
-set MIXER_FILE etc/mixers/open_uas_apprentice.main.mix
 set MIXER open_uas_apprentice
