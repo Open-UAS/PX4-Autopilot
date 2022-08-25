@@ -1,1 +1,85 @@
-../../init.d-posix/airframes/2150_open_uas
+#!/bin/sh
+#
+# @name OpenUAS Veronica
+#
+# @type Standard Plane
+# @class Plane
+#
+
+. ${R}etc/init.d/rc.fw_defaults
+
+if [ $AUTOCNF = yes ]
+then
+	param set EKF2_ARSP_THR 8
+	param set EKF2_FUSE_BETA 1
+	param set EKF2_MAG_ACCLIM 0
+	param set EKF2_MAG_YAWLIM 0
+
+	#autonomous landing parameters
+	param set FW_LND_USETER 1
+	param set FW_LND_AIRSPD_SC 1
+	param set FW_LND_ANG 3
+	param set FW_THR_LND_MAX 0
+	param set FW_LND_EARLYCFG 1
+
+	#param set FW_L1_PERIOD 12
+
+	#wheel steering
+	param set FW_W_EN 1
+
+	#minimum loiter and takeoff alt.
+	param set MIS_LTRMIN_ALT 30
+	param set MIS_TAKEOFF_ALT 30
+	#default loiter radius
+	param set NAV_LOITER_RAD 50
+
+	#waypoint acceptance radius
+	param set NAV_ACC_RAD 15
+	#datalink loss failsafe mode
+	param set NAV_DLL_ACT 2
+
+	#takeoff from runway
+	param set RWTO_TKOFF 1
+
+	#distance sensor for altimeter
+	#Benewake TFmini RangeFinder, Telem 2 port
+	#param set SENS_TFMINI_CFG 102
+
+	#Lightware SF11/c rangefinder, Telem 2 port
+	param set SENS_EN_SF0X 5
+	param set SENS_SF0X_CFG 102
+
+	#use range finder for altitude estimate
+	param set EKF2_TERR_MASK 1
+	#param set EKF2_RNG_AID 1
+	#param set EKF2_RNG_A_VMAX 2
+	#param set EKF2_RNG_A_HMAX 10
+	param set EKF2_MIN_RNG 0.06
+
+	#enable "Full rate estimator (EKF2) replay topics" for logging
+	param set SDLOG_PROFILE 3
+
+	#number of battery cells
+	param set BAT1_N_CELLS 3
+
+	#if PX4_SIM_MODEL is not empty, load simulation parameters
+	if [ -n "$PX4_SIM_MODEL" ]
+	then
+		param set FW_P_TC 0.5
+		param set FW_PR_FF 0.40
+		param set FW_PR_I 0.05
+		param set FW_PR_P 0.05
+
+		param set FW_R_TC 0.7
+		param set FW_RR_FF 0.20
+		param set FW_RR_I 0.02
+		param set FW_RR_P 0.22
+		param set FW_L1_PERIOD 12
+
+		#disable flaps because cannot control flaps with joystick
+		param set FW_FLAPS_SCL 0
+	fi
+
+fi
+
+set MIXER open_uas_apprentice
