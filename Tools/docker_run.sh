@@ -20,7 +20,7 @@ if [ -z ${PX4_DOCKER_REPO+x} ]; then
 	elif [[ $@ =~ .*clang.* ]] || [[ $@ =~ .*scan-build.* ]]; then
 		# clang tools
 		PX4_DOCKER_REPO="px4io/px4-dev-clang:2021-02-04"
-	elif [[ $@ =~ .*tests* ]]; then
+	elif [[ $@ =~ .*tests* ]] || [[ $@ =~ .*px4_sitl.* ]]; then
 		# run all tests with simulation
 		PX4_DOCKER_REPO="px4io/px4-dev-simulation-bionic:2021-02-04"
 	fi
@@ -67,4 +67,5 @@ docker run -it --rm -w "${SRC_DIR}" \
 	--publish 14556:14556/udp \
 	--volume=${CCACHE_DIR}:${CCACHE_DIR}:rw \
 	--volume=${SRC_DIR}:${SRC_DIR}:rw \
+	${DOCKER_OPTIONS} \
 	${PX4_DOCKER_REPO} /bin/bash -c "$1 $2 $3"
