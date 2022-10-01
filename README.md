@@ -13,7 +13,7 @@
  2) Run `git submodule update --init --recursive` to clone all submodules within the repository, to your machine
      - alternatively `git submodule update --init --recursive <submodule folder>` can be used if you know the specific submodule needed 
      - `git submodule update --recursive` can be run in the future to update all submodules
- 3) Follow [this guide](https://dev.px4.io/master/en/setup/dev_env_linux.html) to setup your development enviornmnet
+ 3) Follow [this guide](https://dev.px4.io/master/en/setup/dev_env_linux.html) to setup your development environment
      - The provided scripts by default also download the firmware to `~/src/firmware`, this can be deleted
  4) Attempt to build the [simulation target](https://dev.px4.io/master/en/simulation/gazebo.html#running-the-simulation) of the firmware by running `make px4_sitl gazebo_plane` from within the firmware folder
      - You may need to install additional libraries, these are the ones that work for my system
