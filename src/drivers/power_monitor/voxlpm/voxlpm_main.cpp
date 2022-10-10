@@ -100,10 +100,6 @@ voxlpm_main(int argc, char *argv[])
 			}
 
 			break;
-
-		case 'K': // keep retrying
-			cli.custom1 = 1;
-			break;
 		}
 	}
 

@@ -79,6 +79,10 @@ public:
 private:
 	int			send_led_rgb();
 
+	int			write(uint8_t reg, uint8_t data);
+
+	float			_brightness{1.0f};
+
 	uint8_t		_r{0};
 	uint8_t		_g{0};
 	uint8_t		_b{0};

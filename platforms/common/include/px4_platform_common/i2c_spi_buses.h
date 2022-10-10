@@ -123,7 +123,6 @@ private:
 	{}
 
 
-
 	friend class BusInstanceIterator;
 	friend class I2CSPIDriverBase;
 
