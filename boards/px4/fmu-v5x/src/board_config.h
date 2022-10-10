@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -185,37 +185,32 @@
 #define HW_INFO_INIT           {'V','5','X','x', 'x',0}
 #define HW_INFO_INIT_VER       3 /* Offset in above string of the VER */
 #define HW_INFO_INIT_REV       4 /* Offset in above string of the REV */
-#define BOARD_NUM_SPI_CFG_HW_VERSIONS 3
+#define BOARD_NUM_SPI_CFG_HW_VERSIONS 7
 // Base                   FMUM
-#define V5X00   HW_VER_REV(0x0,0x0) // FMUV5X,                 Rev 0
-#define V5X10   HW_VER_REV(0x1,0x0) // NO PX4IO,               Rev 0
-#define V5X01   HW_VER_REV(0x0,0x1) // FMUV5X I2C2 BMP388,     Rev 1
-#define V5X02   HW_VER_REV(0x0,0x2) // FMUV5X,                 Rev 2
-#define V5X90   HW_VER_REV(0x9,0x0) // NO USB,                 Rev 0
-#define V5X91   HW_VER_REV(0x9,0x1) // NO USB I2C2 BMP388,     Rev 1
-#define V5X92   HW_VER_REV(0x9,0x2) // NO USB I2C2 BMP388,     Rev 2
-#define V5Xa0   HW_VER_REV(0xa,0x0) // NO USB (Q),             Rev 0
-#define V5Xa1   HW_VER_REV(0xa,0x1) // NO USB (Q) I2C2 BMP388, Rev 1
-#define V5Xa2   HW_VER_REV(0xa,0x2) // NO USB (Q) I2C2 BMP388, Rev 2
+#define V5X00   HW_VER_REV(0x0,0x0) // FMUV5X,                         Rev 0
+#define V5X10   HW_VER_REV(0x1,0x0) // NO PX4IO,                       Rev 0
+#define V5X01   HW_VER_REV(0x0,0x1) // FMUV5X I2C2 BMP388,             Rev 1
+#define V5X02   HW_VER_REV(0x0,0x2) // FMUV5X,                         Rev 2
+#define V5X40   HW_VER_REV(0x4,0x0) // FMUV5X, HB CM4 base             Rev 0
+#define V5X41   HW_VER_REV(0x4,0x1) // FMUV5X I2C2 BMP388, HB CM4 base Rev 1
+#define V5X42   HW_VER_REV(0x4,0x2) // FMUV5X, HB CM4 base             Rev 2
+#define V5X50   HW_VER_REV(0x5,0x0) // FMUV5X, HB Mini                 Rev 0
+#define V5X51   HW_VER_REV(0x5,0x1) // FMUV5X I2C2 BMP388, HB Mini     Rev 1
+#define V5X52   HW_VER_REV(0x5,0x2) // FMUV5X, HB Mini                 Rev 2
+#define V5X90   HW_VER_REV(0x9,0x0) // NO USB,                         Rev 0
+#define V5X91   HW_VER_REV(0x9,0x1) // NO USB I2C2 BMP388,             Rev 1
+#define V5X92   HW_VER_REV(0x9,0x2) // NO USB I2C2 BMP388,             Rev 2
+#define V5Xa0   HW_VER_REV(0xa,0x0) // NO USB (Q),                     Rev 0
+#define V5Xa1   HW_VER_REV(0xa,0x1) // NO USB (Q) I2C2 BMP388,         Rev 1
+#define V5Xa2   HW_VER_REV(0xa,0x2) // NO USB (Q) I2C2 BMP388,         Rev 2
+
+#define UAVCAN_NUM_IFACES_RUNTIME 1
 
 /* HEATER
  * PWM in future
  */
 #define GPIO_HEATER_OUTPUT   /* PB10  T2CH3 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTB|GPIO_PIN10)
-
-/* PWM Capture
- *
- * 1  PWM Capture inputs are configured.
- *
- * Pins:
- *
- * FMU_CAP1 : PI0  : TIM5_CH4
- */
-
-#define GPIO_TIM5_CH4IN      /* PI0  T5C4   FMU_CAP1 */ GPIO_TIM5_CH4IN_2
-#define GPIO_TIM5_CH4OUT     /* PI0  T5C4   FMU_CAP1 */ GPIO_TIM5_CH4OUT_2
-
-#define DIRECT_PWM_CAPTURE_CHANNELS  1
+#define HEATER_OUTPUT_EN(on_true)	       px4_arch_gpiowrite(GPIO_HEATER_OUTPUT, (on_true))
 
 /* PC12 is nARMED
  *  The GPIO will be set as input while not armed HW will have external HW Pull UP.
@@ -226,13 +221,12 @@
 
 #if !defined(TRACE_PINS)
 #  define BOARD_INDICATE_EXTERNAL_LOCKOUT_STATE(enabled)  px4_arch_configgpio((enabled) ? GPIO_nARMED : GPIO_nARMED_INIT)
+#  define BOARD_GET_EXTERNAL_LOCKOUT_STATE() px4_arch_gpioread(GPIO_nARMED)
 #endif
 /* PWM
  */
-#define DIRECT_PWM_OUTPUT_CHANNELS  8
-#define DIRECT_INPUT_TIMER_CHANNELS  8
+#define DIRECT_PWM_OUTPUT_CHANNELS  9
 
-#define BOARD_DSHOT_MOTOR_ASSIGNMENT {3, 2, 1, 0, 4, 5, 6, 7};
 
 /* Power supply control and monitoring GPIOs */
 
@@ -314,7 +308,6 @@
 #define INPUT_CAP1_TIMER                  5
 #define INPUT_CAP1_CHANNEL     /* T5C4 */ 4
 #define GPIO_INPUT_CAP1        /*  PI0 */ GPIO_TIM5_CH4IN
-#define BOARD_CAPTURE_GPIO /* PI0 */  (GPIO_INPUT|GPIO_FLOAT|GPIO_EXTI|GPIO_PORTI|GPIO_PIN0)
 
 /* PWM input driver. Use FMU AUX5 pins attached to timer4 channel 2 */
 #define PWMIN_TIMER                       4
@@ -403,7 +396,6 @@
 #define BOARD_ADC_PERIPH_5V_OC  (!px4_arch_gpioread(GPIO_VDD_5V_PERIPH_nOC))
 #define BOARD_ADC_HIPOWER_5V_OC (!px4_arch_gpioread(GPIO_VDD_5V_HIPOWER_nOC))
 
-#define BOARD_HAS_PWM  DIRECT_PWM_OUTPUT_CHANNELS
 
 /* This board provides a DMA pool and APIs */
 #define BOARD_DMA_ALLOC_POOL_SIZE 5120
