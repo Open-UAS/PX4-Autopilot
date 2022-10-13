@@ -41,10 +41,8 @@
 
 #include "bmp388.h"
 
-BMP388::BMP388(I2CSPIBusOption bus_option, int bus, IBMP388 *interface) :
-	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id()), bus_option, bus,
-		     interface->get_device_address()),
-	_px4_baro(interface->get_device_id()),
+BMP388::BMP388(const I2CSPIDriverConfig &config, IBMP388 *interface) :
+	I2CSPIDriver(config),
 	_interface(interface),
 	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
 	_measure_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": measure")),
@@ -70,10 +68,18 @@ BMP388::init()
 		return -EIO;
 	}
 
-	if (_interface->get_reg(BMP3_CHIP_ID_ADDR) != BMP3_CHIP_ID) {
-		PX4_WARN("id of your baro is not: 0x%02x", BMP3_CHIP_ID);
+	_chip_id = _interface->get_reg(BMP3_CHIP_ID_ADDR);
+
+	if (_chip_id != BMP388_CHIP_ID && _chip_id != BMP390_CHIP_ID) {
+		PX4_WARN("id of your baro is not: 0x%02x or 0x%02x", BMP388_CHIP_ID, BMP390_CHIP_ID);
 		return -EIO;
 	}
+
+	if (_chip_id == BMP390_CHIP_ID) {
+		_interface->set_device_type(DRV_BARO_DEVTYPE_BMP390);
+	}
+
+	_chip_rev_id = _interface->get_reg(BMP3_REV_ID_ADDR);
 
 	_cal = _interface->get_calibration(BMP3_CALIB_DATA_ADDR);
 
@@ -101,6 +107,7 @@ void
 BMP388::print_status()
 {
 	I2CSPIDriverBase::print_status();
+	printf("chip id:  0x%02x rev id:  0x%02x\n", _chip_id, _chip_rev_id);
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_measure_perf);
 	perf_print_counter(_comms_errors);
@@ -166,14 +173,18 @@ BMP388::collect()
 		return -EIO;
 	}
 
-	_px4_baro.set_error_count(perf_event_count(_comms_errors));
-
 	float temperature = (float)(data.temperature / 100.0f);
 	float pressure = (float)(data.pressure / 100.0f); // to Pascal
-	pressure = pressure / 100.0f; // to mbar
 
-	_px4_baro.set_temperature(temperature);
-	_px4_baro.update(timestamp_sample, pressure);
+	// publish
+	sensor_baro_s sensor_baro{};
+	sensor_baro.timestamp_sample = timestamp_sample;
+	sensor_baro.device_id = _interface->get_device_id();
+	sensor_baro.pressure = pressure;
+	sensor_baro.temperature = temperature;
+	sensor_baro.error_count = perf_event_count(_comms_errors);
+	sensor_baro.timestamp = hrt_absolute_time();
+	_sensor_baro_pub.publish(sensor_baro);
 
 	perf_end(_sample_perf);
 

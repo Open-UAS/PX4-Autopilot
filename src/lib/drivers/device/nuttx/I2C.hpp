@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2012-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,23 +31,22 @@
  *
  ****************************************************************************/
 
+#pragma once
+
 /**
- * @file i2c.h
+ * @file I2C.hpp
  *
  * Base class for devices connected via I2C.
  */
 
-#ifndef _DEVICE_I2C_H
-#define _DEVICE_I2C_H
-
 #include "../CDev.hpp"
 #include <px4_platform_common/i2c.h>
 
+#if defined(CONFIG_I2C)
+
 #include <nuttx/i2c/i2c_master.h>
 
-#if !defined(CONFIG_I2C)
-#  error I2C support requires CONFIG_I2C
-#endif
+struct I2CSPIDriverConfig;
 
 namespace device __EXPORT
 {
@@ -87,6 +86,7 @@ protected:
 	 * @param frequency	I2C bus frequency for the device (currently not used)
 	 */
 	I2C(uint8_t device_type, const char *name, const int bus, const uint16_t address, const uint32_t frequency);
+	I2C(const I2CSPIDriverConfig &config);
 	virtual ~I2C();
 
 	/**
@@ -108,7 +108,7 @@ protected:
 	 */
 	int		transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, const unsigned recv_len);
 
-	bool	external() const override { return px4_i2c_bus_external(_device_id.devid_s.bus); }
+	bool	external() const override { return px4_i2c_device_external(_device_id.devid); }
 
 private:
 	static unsigned	int	_bus_clocks[PX4_NUMBER_I2C_BUSES];
@@ -120,4 +120,4 @@ private:
 
 } // namespace device
 
-#endif /* _DEVICE_I2C_H */
+#endif // CONFIG_I2C
