@@ -19,7 +19,19 @@ if [ -z ${PX4_DOCKER_REPO+x} ]; then
 		PX4_DOCKER_REPO="px4io/px4-dev-clang:2021-02-04"
 	elif [[ $@ =~ .*tests* ]] || [[ $@ =~ .*px4_sitl.* ]]; then
 		# run all tests with simulation
-		PX4_DOCKER_REPO="px4io/px4-dev-simulation-bionic:2021-12-11"
+		GAZEBO_VERSION=$(gazebo --version | sed -n -e 's/^.*version //p' | sed 's/\.[^ ]*//g')
+		if [[ "$GAZEBO_VERSION" == "9" ]]; then
+			echo "Found gazebo version $GAZEBO_VERSION"
+			PX4_DOCKER_REPO="px4io/px4-dev-simulation-bionic:latest"
+			echo "PX4_DOCKER_REPO is set to '$PX4_DOCKER_REPO'";
+		elif [[ "$GAZEBO_VERSION" == "11" ]]; then
+			echo "Found gazebo version $GAZEBO_VERSION"
+			PX4_DOCKER_REPO="px4io/px4-dev-simulation-focal:latest"
+			echo "PX4_DOCKER_REPO is set to '$PX4_DOCKER_REPO'";
+		else
+			echo "Warning: Gazebo version could not be identified, defaulting to gazebo 9"
+			PX4_DOCKER_REPO="px4io/px4-dev-simulation-bionic:latest"
+		fi
 	fi
 else
 	echo "PX4_DOCKER_REPO is set to '$PX4_DOCKER_REPO'";
