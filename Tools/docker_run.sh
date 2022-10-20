@@ -78,4 +78,3 @@ docker run -it --rm -w "${SRC_DIR}" \
 	--volume=${SRC_DIR}:${SRC_DIR}:rw \
 	${DOCKER_OPTIONS} \
 	${PX4_DOCKER_REPO} /bin/bash -c "$1 $2 $3"
-
