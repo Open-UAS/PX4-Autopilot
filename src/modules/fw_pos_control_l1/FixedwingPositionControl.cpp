@@ -51,11 +51,14 @@ using matrix::wrap_pi;
 
 // abort reasons
 // after the manual operator abort, corresponds to individual bits of param FW_LND_ABORT
-const uint8_t NOT_ABORTED = 0;
-const uint8_t ABORTED_BY_OPERATOR = 1;
-const uint8_t TERRAIN_NOT_FOUND = 2;
-const uint8_t TERRAIN_TIMEOUT = 3;
-const uint8_t UNKNOWN_ABORT_CRITERION = 4;
+enum landing_abort_reason
+{
+	NOT_ABORTED,
+	ABORTED_BY_OPERATOR,
+	TERRAIN_NOT_FOUND,
+	TERRAIN_TIMEOUT,
+	UNKNOWN_ABORT_CRITERION
+};
 
 
 FixedwingPositionControl::FixedwingPositionControl(bool vtol) :
@@ -264,7 +267,7 @@ FixedwingPositionControl::vehicle_command_poll()
 			    _pos_sp_triplet.current.valid &&
 			    (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND)) {
 
-				updateLandingAbortStatus(ABORTED_BY_OPERATOR);
+				updateLandingAbortStatus(landing_abort_reason::ABORTED_BY_OPERATOR);
 			}
 
 		} else if ((vehicle_command.command == vehicle_command_s::VEHICLE_CMD_DO_CHANGE_SPEED)
@@ -647,21 +650,21 @@ FixedwingPositionControl::updateLandingAbortStatus(const uint8_t new_abort_statu
 		//events::send(events::ID("fixedwing_position_control_land_aborted"), events::Log::Critical, "Landing aborted");
 
 		switch (new_abort_status) {
-		case (ABORTED_BY_OPERATOR): {
+		case (landing_abort_reason::ABORTED_BY_OPERATOR): {
 				mavlink_log_critical(&_mavlink_log_pub, "Landing aborted by operator\t");
 				events::send(events::ID("fixedwing_position_control_landing_abort_status_operator_abort"), events::Log::Critical,
 					     "Landing aborted by operator");
 				break;
 			}
 
-		case (TERRAIN_NOT_FOUND): {
+		case (landing_abort_reason::TERRAIN_NOT_FOUND): {
 				mavlink_log_critical(&_mavlink_log_pub, "Landing aborted: terrain estimate not found\t");
 				events::send(events::ID("fixedwing_position_control_landing_abort_status_terrain_not_found"), events::Log::Critical,
 					     "Landing aborted: terrain measurement not found");
 				break;
 			}
 
-		case (TERRAIN_TIMEOUT): {
+		case (landing_abort_reason::TERRAIN_TIMEOUT): {
 				mavlink_log_critical(&_mavlink_log_pub, "Landing aborted: terrain estimate timed out\t");
 				events::send(events::ID("fixedwing_position_control_landing_abort_status_terrain_timeout"), events::Log::Critical,
 					     "Landing aborted: terrain estimate timed out");
@@ -676,8 +679,8 @@ FixedwingPositionControl::updateLandingAbortStatus(const uint8_t new_abort_statu
 		}
 	}
 
-	_landing_abort_status = (new_abort_status >= UNKNOWN_ABORT_CRITERION) ?
-				UNKNOWN_ABORT_CRITERION : new_abort_status;
+	_landing_abort_status = (new_abort_status >= static_cast<uint8_t>(landing_abort_reason::UNKNOWN_ABORT_CRITERION)) ?
+				static_cast<uint8_t>(landing_abort_reason::UNKNOWN_ABORT_CRITERION) : new_abort_status;
 	landing_status_publish();
 }
 
@@ -1438,7 +1441,7 @@ FixedwingPositionControl::control_auto_loiter(const hrt_abstime &now, const floa
 	if (_landing_abort_status) {
 		if (pos_sp_curr.alt - _current_altitude  < _param_fw_clmbout_diff.get()) {
 			// aborted landing complete, normal loiter over landing point
-			updateLandingAbortStatus(NOT_ABORTED);
+			updateLandingAbortStatus(landing_abort_reason::NOT_ABORTED);
 
 		} else {
 			// continue straight until vehicle has sufficient altitude
@@ -1855,7 +1858,7 @@ FixedwingPositionControl::control_auto_landing(const hrt_abstime &now, const Vec
 			} else {
 				// still no valid terrain, abort landing
 				terrain_alt = pos_sp_curr.alt;
-				updateLandingAbortStatus(TERRAIN_NOT_FOUND);
+				updateLandingAbortStatus(landing_abort_reason::TERRAIN_NOT_FOUND);
 			}
 
 		} else if ((!_local_pos.dist_bottom_valid && (now - _time_last_t_alt) < T_ALT_TIMEOUT)
@@ -1868,7 +1871,7 @@ FixedwingPositionControl::control_auto_landing(const hrt_abstime &now, const Vec
 		} else {
 			// terrain alt was not valid for long time, abort landing
 			terrain_alt = _t_alt_prev_valid;
-			updateLandingAbortStatus(TERRAIN_TIMEOUT);
+			updateLandingAbortStatus(landing_abort_reason::TERRAIN_TIMEOUT);
 		}
 	}
 
@@ -2607,7 +2610,7 @@ FixedwingPositionControl::reset_landing_state()
 	// reset abort land, unless loitering after an abort
 	if (_landing_abort_status && (_pos_sp_triplet.current.type != position_setpoint_s::SETPOINT_TYPE_LOITER)) {
 
-		updateLandingAbortStatus(NOT_ABORTED);
+		updateLandingAbortStatus(landing_abort_reason::NOT_ABORTED);
 	}
 }
 
