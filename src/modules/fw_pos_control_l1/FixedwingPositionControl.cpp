@@ -50,16 +50,17 @@ using matrix::Vector3f;
 using matrix::wrap_pi;
 
 // abort reasons
-// after the manual operator abort, corresponds to individual bits of param FW_LND_ABORT
+// 0 if not aborted
+// >0 if aborted, with the singular abort criterion which triggered the landing
+// abort enumerated by the following abort reasons
 enum landing_abort_reason
 {
 	NOT_ABORTED,
 	ABORTED_BY_OPERATOR,
-	TERRAIN_NOT_FOUND,
-	TERRAIN_TIMEOUT,
+	TERRAIN_NOT_FOUND, // FW_LND_ABORT (1 << 0)
+	TERRAIN_TIMEOUT,   // FW_LND_ABORT (1 << 1)
 	UNKNOWN_ABORT_CRITERION
 };
-
 
 FixedwingPositionControl::FixedwingPositionControl(bool vtol) :
 	ModuleParams(nullptr),
