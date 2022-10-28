@@ -212,7 +212,7 @@ private:
 	bool _land_stayonground{false};
 	bool _land_motor_lim{false};
 	bool _land_onslope{false};
-	bool _land_abort{false};
+	uint8_t _landing_abort_status{0};
 
 	Landingslope _landingslope;
 
@@ -319,7 +319,8 @@ private:
 	void		tecs_status_publish();
 	void 		publishLocalPositionSetpoint(const position_setpoint_s &current_waypoint);
 
-	void		abort_landing(bool abort);
+	void updateLandingAbortStatus(const uint8_t new_abort_status = 0);
+
 
 	/**
 	 * Get a new waypoint based on heading and distance from current position
