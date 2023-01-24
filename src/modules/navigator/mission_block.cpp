@@ -59,14 +59,7 @@ using matrix::wrap_pi;
 MissionBlock::MissionBlock(Navigator *navigator) :
 	NavigatorMode(navigator)
 {
-	_mission_item.lat = (double)NAN;
-	_mission_item.lon = (double)NAN;
-	_mission_item.yaw = NAN;
-	_mission_item.loiter_radius = _navigator->get_loiter_radius();
-	_mission_item.acceptance_radius = _navigator->get_acceptance_radius();
-	_mission_item.time_inside = 0.0f;
-	_mission_item.autocontinue = true;
-	_mission_item.origin = ORIGIN_ONBOARD;
+
 }
 
 bool
@@ -607,7 +600,7 @@ MissionBlock::mission_item_to_position_setpoint(const mission_item_s &item, posi
 			    _navigator->get_loiter_radius();
 	sp->loiter_direction = (item.loiter_radius > 0) ? 1 : -1;
 
-	if (item.acceptance_radius > 0.0f && PX4_ISFINITE(item.acceptance_radius)) {
+	if (item.acceptance_radius > 0.001f && PX4_ISFINITE(item.acceptance_radius)) {
 		// if the mission item has a specified acceptance radius, overwrite the default one from parameters
 		sp->acceptance_radius = item.acceptance_radius;
 
@@ -736,6 +729,7 @@ MissionBlock::set_takeoff_item(struct mission_item_s *item, float abs_altitude)
 	item->altitude = abs_altitude;
 	item->altitude_is_relative = false;
 
+	item->acceptance_radius = _navigator->get_acceptance_radius();
 	item->loiter_radius = _navigator->get_loiter_radius();
 	item->autocontinue = false;
 	item->origin = ORIGIN_ONBOARD;
@@ -837,4 +831,17 @@ MissionBlock::get_absolute_altitude_for_item(const mission_item_s &mission_item)
 	} else {
 		return mission_item.altitude;
 	}
+}
+
+void
+MissionBlock::initialize()
+{
+	_mission_item.lat = (double)NAN;
+	_mission_item.lon = (double)NAN;
+	_mission_item.yaw = NAN;
+	_mission_item.loiter_radius = _navigator->get_loiter_radius();
+	_mission_item.acceptance_radius = _navigator->get_acceptance_radius();
+	_mission_item.time_inside = 0.0f;
+	_mission_item.autocontinue = true;
+	_mission_item.origin = ORIGIN_ONBOARD;
 }
